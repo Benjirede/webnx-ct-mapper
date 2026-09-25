@@ -1,36 +1,18 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WebNX Custom Tech (CT) Floor Asset & Project Mapper
 
-## Getting Started
+An interactive, responsive digital twin dashboard built to solve physical inventory fragmentation and streamline workflow allocation inside the WebNX configuration lab.
 
-First, run the development server:
+## 🚀 The Business Problem Solved
+Previously, hardware components assigned to large-scale, custom server builds were staged on warehouse pallets in the CT floor area with zero real-time visual tracking. This forced techs to manually search the floor to match physical pallets with incoming client project profiles, leading to time fragmentation. 
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This internal utility creates a localized **digital map grid** of the physical floor space, mapping spatial coordinate locations to active hardware batches and matching them directly with active profiles in the primary company database.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Technical Stack
+* **Framework:** Next.js 14 (App Router Architecture)
+* **Frontend UI:** React, TypeScript, Tailwind CSS (Interactive Grid Engine)
+* **Backend Data Layer:** Node.js API Routes with localized filesystem JSON stream caching for lightweight, zero-overhead execution behind strict datacenter firewalls.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ⚙️ Key Architectural Implementations
+* **Decoupled URL Integration:** Securely maps operational anchors to external company tracking IDs (`https://webnx.com[id]`) via clean URL parsing, providing immediate business utility without touching or risking production database integrity.
+* **Responsive State Engine:** Utilizes React state to instantly track populated vs. empty spatial slots, flashing visual alerts (Tailwind dynamic styles) to prevent pallet allocation collisions.
+* **Enterprise Asset Ready:** Engineered explicitly using JavaScript/TypeScript to natively align with WebNX's existing web property infrastructure (`webnx.com` and `gorillaservers.com`).
