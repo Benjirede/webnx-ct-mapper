@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import db from "@/app/lib/db";
 
+/**
+ * Reads the current state of all pallet slots from the database and returns them as a JSON response.
+ * @returns 
+ */
 export async function GET() {
   try {
     const slots = db.prepare('SELECT * FROM pallet_slots').all();
@@ -18,6 +22,11 @@ export async function GET() {
   }
 }
 
+/**
+ * Handles POST requests to create or update pallet slot data in the database.
+ * @param request 
+ * @returns 
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();

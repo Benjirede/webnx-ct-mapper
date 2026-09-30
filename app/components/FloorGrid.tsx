@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 
+/**
+ * Represents a physical pallet in the warehouse layout.
+ */
 interface PhysicalPallet {
   id: string;
   isOccupied: boolean;
