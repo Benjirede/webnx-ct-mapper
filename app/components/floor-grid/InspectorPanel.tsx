@@ -1,0 +1,50 @@
+import { useState } from "react";
+import { PhysicalPallet } from "./types";
+
+interface Props {
+  slot: PhysicalPallet;
+  onSave: (projectId: string, notes: string) => void;
+}
+
+export default function InspectorPanel({ slot, onSave }: Props) {
+  const [projectId, setProjectId] = useState(slot.projectId);
+  const [notes, setNotes] = useState(slot.notes);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <span className="text-xs text-gray-400 font-mono block">LOCATION SLOT</span>
+        <p className="text-xl font-bold text-emerald-400">{slot.id}</p>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs text-gray-400 font-mono block">PROJECT PROFILE ID (PALLET)</label>
+        <input
+          type="text"
+          placeholder="Enter ID to spawn pallet (Clear to empty)"
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs text-gray-400 font-mono block">CONTENTS / BATCH INFO</label>
+        <textarea
+          rows={3}
+          placeholder="Specify server equipment chassis specifications..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-400 resize-none"
+        />
+      </div>
+
+      <button
+        onClick={() => onSave(projectId, notes)}
+        className="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-2 rounded text-sm transition-colors"
+      >
+        Sync Data State
+      </button>
+    </div>
+  );
+}
