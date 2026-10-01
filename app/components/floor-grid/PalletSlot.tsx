@@ -1,4 +1,5 @@
 import { PhysicalPallet } from "./types";
+import styles from "./PalletSlot.module.css";
 
 interface Props {
   slot: PhysicalPallet;
@@ -28,13 +29,13 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
       style={{ left: `${slot.xPos}%`, top: `${slot.yPos}%` }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
-      className="absolute transform -translate-x-1/2 -translate-y-1/2 p-1"
+      className={styles.positioner}
     >
       <button
         onClick={() => onSelect(slot)}
         draggable={isAdminMode || slot.isOccupied}
         onDragStart={handleDragStart}
-        className={`w-28 h-20 rounded-md border text-left p-2 transition-all flex flex-col justify-between shadow-lg relative ${
+        className={`${styles.slotButton} shadow-lg ${
           isAdminMode
             ? "bg-gray-900 border-amber-500 text-amber-300 cursor-move border-dashed hover:border-amber-400"
             : slot.isOccupied
