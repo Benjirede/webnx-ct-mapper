@@ -55,9 +55,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
             }`}
           ></span>
         </div>
-        <div className="text-[10px] font-medium truncate w-full tracking-tight">
-          {isAdminMode ? `📐 X:${slot.xPos}% Y:${slot.yPos}%` : slot.isOccupied ? `ID: ${slot.projectId}` : "✨ EMPTY ZONE"}
-        </div>
+        
       </button>
     </div>
   );

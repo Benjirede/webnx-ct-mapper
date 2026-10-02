@@ -81,6 +81,8 @@ export default function FloorCanvas({
             isAdminMode={isAdminMode}
             isSelected={selectedSlot?.id === slot.id}
             matchesSearch={query !== "" && slot.projectId.toLowerCase().includes(query)}
+            cellWidth={grid?.cellWidth ?? 90}
+            cellHeight={grid?.cellHeight ?? 80}
             onSelect={onSelect}
             onPalletDrop={onPalletDrop}
           />

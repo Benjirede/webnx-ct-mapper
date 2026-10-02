@@ -1,7 +1,7 @@
 import type { PhysicalPallet } from "./types";
 
-const CELL_WIDTH = 128;
-const CELL_HEIGHT = 96;
+const CELL_WIDTH = 90;
+const CELL_HEIGHT = 80;
 
 export interface CanvasSize {
   width: number;

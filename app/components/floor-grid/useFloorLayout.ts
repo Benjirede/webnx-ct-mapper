@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PhysicalPallet, type BayId } from "./types";
+import { PhysicalPallet, type BayId, type NewFloorItem } from "./types";
 import { fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, type CanvasSize } from "./layoutPositions";
 
@@ -59,16 +59,16 @@ export function useFloorLayout() {
     await postSlot({ ...renamed, action: "rename", oldId: selectedSlot.id });
   };
 
-  const createZone = async (newId: string) => {
-    if (!newId.trim()) return false;
-    const finalId = newId.trim().toUpperCase();
+  const createZone = async (newItem: NewFloorItem) => {
+    if (!newItem.id.trim()) return false;
+    const finalId = newItem.id.trim().toUpperCase();
 
     if (slots.some((s) => s.id === finalId)) {
       alert("A location bay with that name already exists on the map blueprint!");
       return false;
     }
 
-    const position = findNearestOpenPosition(activeSlots, canvasSize, 50, 50);
+    const position = findNearestOpenPosition(activeSlots, canvasSize, 50, 50, undefined, newItem);
     if (!position) {
       alert("No open pallet-sized location is available on the floor layout.");
       return false;
@@ -77,6 +77,9 @@ export function useFloorLayout() {
     const brandNew: PhysicalPallet = {
       id: finalId,
       bayId: activeBay,
+      itemType: newItem.itemType,
+      widthCells: newItem.widthCells,
+      heightCells: newItem.heightCells,
       isOccupied: false,
       projectId: "",
       notes: "",
