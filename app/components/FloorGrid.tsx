@@ -21,10 +21,12 @@ export default function FloorGrid() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
         <FloorCanvas
-          slots={layout.slots}
+          slots={layout.activeSlots}
           selectedSlot={selectedSlot}
           isAdminMode={isAdminMode}
           searchQuery={layout.searchQuery}
+          activeBay={layout.activeBay}
+          onBayChange={layout.selectBay}
           onSelect={layout.selectSlot}
           onPalletDrop={layout.movePallet}
           onZoneMove={layout.moveZone}

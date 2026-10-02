@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PhysicalPallet } from "./types";
+import { PhysicalPallet, type BayId } from "./types";
 import { fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, type CanvasSize } from "./layoutPositions";
 
@@ -8,8 +8,15 @@ export function useFloorLayout() {
   const [selectedSlot, setSelectedSlot] = useState<PhysicalPallet | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [activeBay, setActiveBay] = useState<BayId>("bay3");
   const [searchQuery, setSearchQuery] = useState("");
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
+  const activeSlots = slots.filter((slot) => slot.bayId === activeBay);
+
+  const selectBay = (bay: BayId) => {
+    setActiveBay(bay);
+    setSelectedSlot(null);
+  };
 
   useEffect(() => {
     fetchLayout().then((data) => {
@@ -49,7 +56,7 @@ export function useFloorLayout() {
     setSlots((prev) => prev.map((s) => (s.id === selectedSlot.id ? renamed : s)));
     setSelectedSlot(renamed);
 
-    await postSlot({ ...renamed, action: "create", oldId: selectedSlot.id });
+    await postSlot({ ...renamed, action: "rename", oldId: selectedSlot.id });
   };
 
   const createZone = async (newId: string) => {
@@ -61,7 +68,7 @@ export function useFloorLayout() {
       return false;
     }
 
-    const position = findNearestOpenPosition(slots, canvasSize, 50, 50);
+    const position = findNearestOpenPosition(activeSlots, canvasSize, 50, 50);
     if (!position) {
       alert("No open pallet-sized location is available on the floor layout.");
       return false;
@@ -69,6 +76,7 @@ export function useFloorLayout() {
 
     const brandNew: PhysicalPallet = {
       id: finalId,
+      bayId: activeBay,
       isOccupied: false,
       projectId: "",
       notes: "",
@@ -84,9 +92,9 @@ export function useFloorLayout() {
   /** xPct / yPct are raw canvas percentages; placement snaps to the nearest open cell. */
   const moveZone = async (sourceId: string, xPct: number, yPct: number) => {
     const target = slots.find((s) => s.id === sourceId);
-    if (!target) return;
+    if (!target || target.bayId !== activeBay) return;
 
-    const position = findNearestOpenPosition(slots, canvasSize, xPct, yPct, sourceId);
+    const position = findNearestOpenPosition(activeSlots, canvasSize, xPct, yPct, sourceId);
     if (!position) {
       alert("No open pallet-sized location is available on the floor layout.");
       return;
@@ -106,7 +114,7 @@ export function useFloorLayout() {
     }
 
     const sourceSlot = slots.find((s) => s.id === sourceId);
-    if (!sourceSlot || !sourceSlot.isOccupied) return;
+    if (!sourceSlot || !sourceSlot.isOccupied || sourceSlot.bayId !== activeBay || targetSlot.bayId !== activeBay) return;
 
     const newTarget = {
       ...targetSlot,
@@ -131,10 +139,13 @@ export function useFloorLayout() {
     selectedSlot,
     loading,
     isAdminMode,
+    activeBay,
+    activeSlots,
     searchQuery,
     setCanvasSize,
     setSearchQuery,
     selectSlot: setSelectedSlot,
+    selectBay,
     toggleAdminMode,
     saveDetails,
     renameZone,

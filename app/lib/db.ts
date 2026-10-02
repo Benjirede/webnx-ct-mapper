@@ -17,27 +17,32 @@ db.exec(`
   );
 `);
 
+const palletSlotColumns = db.prepare("PRAGMA table_info(pallet_slots)").all() as Array<{ name: string }>;
+if (!palletSlotColumns.some((column) => column.name === "bay_id")) {
+  db.exec("ALTER TABLE pallet_slots ADD COLUMN bay_id TEXT NOT NULL DEFAULT 'bay3'");
+}
+
 // Seed initial irregular layout data if the table is brand new and empty
 const rowCount = db.prepare('SELECT COUNT(*) as count FROM pallet_slots').get() as { count: number };
 if (rowCount.count === 0) {
   const insert = db.prepare(`
-    INSERT INTO pallet_slots (id, is_occupied, project_id, notes, x_pos, y_pos) 
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO pallet_slots (id, is_occupied, project_id, notes, x_pos, y_pos, bay_id) 
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   
   // Dense Staging Area - Left Zone
-  insert.run('BAY-L1', 1, '9842', 'Supermicro 1U chassis', 10, 15);
-  insert.run('BAY-L2', 0, '', '', 10, 40);
-  insert.run('BAY-L3', 0, '', '', 15, 65);
+  insert.run('BAY-L1', 1, '9842', 'Supermicro 1U chassis', 10, 15, 'bay3');
+  insert.run('BAY-L2', 0, '', '', 10, 40, 'bay3');
+  insert.run('BAY-L3', 0, '', '', 15, 65, 'bay3');
 
   // Center Island Pallets (Irregular island)
-  insert.run('ISLAND-1', 1, '5512', 'GorillaServers AMD EPYC', 45, 30);
-  insert.run('ISLAND-2', 0, '', '', 45, 55);
+  insert.run('ISLAND-1', 1, '5512', 'GorillaServers AMD EPYC', 45, 30, 'bay3');
+  insert.run('ISLAND-2', 0, '', '', 45, 55, 'bay3');
 
   // Staggered Heavy Pallets - Right Zone (Spaced out diagonally for forklift clearance)
-  insert.run('RACK-R1', 0, '', '', 75, 20);
-  insert.run('RACK-R2', 1, '1104', 'RAM/SSD Storage carts', 80, 50);
-  insert.run('RACK-R3', 0, '', '', 85, 80);
+  insert.run('RACK-R1', 0, '', '', 75, 20, 'bay3');
+  insert.run('RACK-R2', 1, '1104', 'RAM/SSD Storage carts', 80, 50, 'bay3');
+  insert.run('RACK-R3', 0, '', '', 85, 80, 'bay3');
 }
 
 export default db;
