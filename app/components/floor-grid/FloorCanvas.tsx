@@ -61,7 +61,9 @@ export default function FloorCanvas({
         ref={canvasRef}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className={`rounded-xl p-4 relative min-h-[750px] shadow-inner overflow-hidden border transition-all ${
+        className={`rounded-xl p-4 relative ${
+          activeBay === "bay4" || activeBay === "bay5" ? "min-h-[1500px]" : "min-h-[750px]"
+        } shadow-inner overflow-hidden border transition-all ${
           isAdminMode
             ? "bg-gray-950 border-amber-500/50 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)]"
             : "bg-gray-950 border-gray-800"
@@ -81,8 +83,6 @@ export default function FloorCanvas({
             isAdminMode={isAdminMode}
             isSelected={selectedSlot?.id === slot.id}
             matchesSearch={query !== "" && slot.projectId.toLowerCase().includes(query)}
-            cellWidth={grid?.cellWidth ?? 90}
-            cellHeight={grid?.cellHeight ?? 80}
             onSelect={onSelect}
             onPalletDrop={onPalletDrop}
           />
