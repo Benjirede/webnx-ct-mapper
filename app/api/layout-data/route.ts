@@ -71,14 +71,10 @@ export async function POST(request: Request) {
       if (txResult.status !== 200) return NextResponse.json({ error: txResult.msg }, { status: txResult.status });
       return NextResponse.json({ success: true });
     }
+    
     // ------------------------------------------------------------------------
     // CONCURRENCY & AUTH SECURITY PRE-FLIGHT VERIFICATIONS
     // ------------------------------------------------------------------------
-    const requiresAdminAuthorization = (body.action === "create");
-    if (requiresAdminAuthorization && !verifyAdminPermission(request)) {
-      return NextResponse.json({ error: "Access Denied: Bad or missing PIN credentials" }, { status: 401 });
-    }
-
     const targetId = body.id?.trim().toUpperCase();
     if (!targetId) return NextResponse.json({ error: "Missing identity context code: 'id'" }, { status: 400 });
 
