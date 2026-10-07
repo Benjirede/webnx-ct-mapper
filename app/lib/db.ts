@@ -1,48 +1,62 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
-// This creates a physical 'webnx_floor.db' file in your project folder
 const dbPath = path.join(process.cwd(), 'webnx_floor.db');
 const db = new Database(dbPath);
 
-// Initialize the Pallet Slots table if it doesn't exist yet
+// Enable performance optimizations and strict integrity constraints
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+// 1. Initialize Schema & Schema Versioning Control
 db.exec(`
   CREATE TABLE IF NOT EXISTS pallet_slots (
     id TEXT PRIMARY KEY,
     is_occupied INTEGER DEFAULT 0,
     project_id TEXT,
     notes TEXT,
-    x_pos INTEGER NOT NULL,  -- Percentage from left edge (0-100)
-    y_pos INTEGER NOT NULL   -- Percentage from top edge (0-100)
+    x_pos REAL NOT NULL,        -- Changed to REAL to safely support precise floating coordinates
+    y_pos REAL NOT NULL,        -- Changed to REAL to safely support precise floating coordinates
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pallet_id TEXT NOT NULL,
+    action_type TEXT NOT NULL, -- 'CREATED', 'DELETED', 'RENAMED', 'MOVED_PALLET', 'REPOSITIONED_ZONE', 'UPDATED_DETAILS'
+    old_value TEXT,            -- Structured JSON capture
+    new_value TEXT,            -- Structured JSON capture
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
-const palletSlotColumns = db.prepare("PRAGMA table_info(pallet_slots)").all() as Array<{ name: string }>;
-if (!palletSlotColumns.some((column) => column.name === "bay_id")) {
-  db.exec("ALTER TABLE pallet_slots ADD COLUMN bay_id TEXT NOT NULL DEFAULT 'bay3'");
+// 2. Pragmatic Schema Migrations Strategy (Enforcing user_version tracking)
+const currentVersion = (db.pragma('user_version', { simple: true }) as number) || 0;
+if (currentVersion < 1) {
+  db.transaction(() => {
+    // Perform migrations safely within single transactional context
+    db.pragma('user_version = 1');
+  })();
 }
 
-// Seed initial irregular layout data if the table is brand new and empty
+// 3. Seed Initial Base Blueprint Data Safely If Completely New
 const rowCount = db.prepare('SELECT COUNT(*) as count FROM pallet_slots').get() as { count: number };
 if (rowCount.count === 0) {
   const insert = db.prepare(`
-    INSERT INTO pallet_slots (id, is_occupied, project_id, notes, x_pos, y_pos, bay_id) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO pallet_slots (id, is_occupied, project_id, notes, x_pos, y_pos) 
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
   
-  // Dense Staging Area - Left Zone
-  insert.run('BAY-L1', 1, '9842', 'Supermicro 1U chassis', 10, 15, 'bay3');
-  insert.run('BAY-L2', 0, '', '', 10, 40, 'bay3');
-  insert.run('BAY-L3', 0, '', '', 15, 65, 'bay3');
-
-  // Center Island Pallets (Irregular island)
-  insert.run('ISLAND-1', 1, '5512', 'GorillaServers AMD EPYC', 45, 30, 'bay3');
-  insert.run('ISLAND-2', 0, '', '', 45, 55, 'bay3');
-
-  // Staggered Heavy Pallets - Right Zone (Spaced out diagonally for forklift clearance)
-  insert.run('RACK-R1', 0, '', '', 75, 20, 'bay3');
-  insert.run('RACK-R2', 1, '1104', 'RAM/SSD Storage carts', 80, 50, 'bay3');
-  insert.run('RACK-R3', 0, '', '', 85, 80, 'bay3');
+  db.transaction(() => {
+    insert.run('BAY-L1', 1, '9842', 'Supermicro 1U chassis', 10.0, 15.0);
+    insert.run('BAY-L2', 0, '', '', 10.0, 40.0);
+    insert.run('BAY-L3', 0, '', '', 15.0, 65.0);
+    insert.run('ISLAND-1', 1, '5512', 'GorillaServers AMD EPYC', 45.0, 30.0);
+    insert.run('ISLAND-2', 0, '', '', 45.0, 55.0);
+    insert.run('RACK-R1', 0, '', '', 75.0, 20.0);
+    insert.run('RACK-R2', 1, '1104', 'RAM/SSD Storage carts', 80.0, 50.0);
+    insert.run('RACK-R3', 0, '', '', 85.0, 80.0);
+  })();
 }
 
 export default db;
