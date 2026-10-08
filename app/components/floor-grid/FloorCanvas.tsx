@@ -17,7 +17,7 @@ interface Props {
   onPalletDrop: (sourceId: string, target: PhysicalPallet) => void;
   onZoneMove: (sourceId: string, xPct: number, yPct: number) => void;
   onCanvasSizeChange: (size: CanvasSize) => void;
-  isPlacingPallet: boolean;
+  isPlacingItem: boolean;
   pendingFootprint: GridFootprint | null;
   placementAvailable: boolean;
   onFootprintChange: (footprint: GridFootprint | null) => void;
@@ -26,7 +26,7 @@ interface Props {
 
 export default function FloorCanvas({
   slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onPalletDrop, onZoneMove, onCanvasSizeChange,
-  isPlacingPallet, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
+  isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -132,7 +132,7 @@ export default function FloorCanvas({
     if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
 
     const viewport = e.currentTarget;
-    if (isAdminMode && isPlacingPallet) {
+    if (isAdminMode && isPlacingItem) {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -228,7 +228,7 @@ export default function FloorCanvas({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onLostPointerCapture={handlePointerCancel}
-        className={`${styles.viewport} ${isPlacingPallet ? styles.placementMode : ""} w-full overflow-auto overscroll-contain rounded-xl border shadow-inner ${
+        className={`${styles.viewport} ${isPlacingItem ? styles.placementMode : ""} w-full overflow-auto overscroll-contain rounded-xl border shadow-inner ${
           isAdminMode
           ? "bg-gray-950 border-amber-500/50"
             : "bg-gray-950 border-gray-800"

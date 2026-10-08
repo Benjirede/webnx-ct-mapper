@@ -1,30 +1,40 @@
 import { useState } from "react";
-import { PhysicalPallet, type GridFootprint } from "./types";
+import {
+  FLOOR_ITEM_LABELS,
+  FLOOR_ITEM_TYPES,
+  type FloorItemType,
+  type GridFootprint,
+  type PhysicalPallet,
+} from "./types";
 
 interface Props {
   selectedSlot: PhysicalPallet | null;
-  isPlacingPallet: boolean;
+  isPlacingItem: boolean;
   pendingFootprint: GridFootprint | null;
   placementAvailable: boolean;
   onStartPlacement: () => void;
   onCancelPlacement: () => void;
-  onCreate: (id: string, footprint: GridFootprint) => Promise<boolean>;
+  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint) => Promise<boolean>;
   onRename: (newName: string) => void;
 }
 
 export default function AdminPanel({
-  selectedSlot, isPlacingPallet, pendingFootprint, placementAvailable,
+  selectedSlot, isPlacingItem, pendingFootprint, placementAvailable,
   onStartPlacement, onCancelPlacement, onCreate, onRename,
 }: Props) {
   const [newSlotId, setNewSlotId] = useState("");
+  const [itemType, setItemType] = useState<FloorItemType>("pallet");
   const [renameValue, setRenameValue] = useState(selectedSlot?.id ?? "");
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingFootprint || !placementAvailable) return;
-    const confirmation = `Create ${newSlotId.trim()} as a ${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} pallet in the selected bay?`;
+    const confirmation = `Create ${newSlotId.trim()} as ${FLOOR_ITEM_LABELS[itemType]} (${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} cells) in this bay?`;
     if (!window.confirm(confirmation)) return;
-    if (await onCreate(newSlotId, pendingFootprint)) setNewSlotId("");
+    if (await onCreate(newSlotId, itemType, pendingFootprint)) {
+      setNewSlotId("");
+      setItemType("pallet");
+    }
   };
 
   return (
@@ -34,17 +44,29 @@ export default function AdminPanel({
       </h2>
 
       <form onSubmit={handleCreate} className="space-y-2">
-        <label htmlFor="new-pallet-id" className="text-xs text-gray-400 font-mono block">CREATE PALLET</label>
+        <label htmlFor="new-pallet-id" className="text-xs text-gray-400 font-mono block">ADD BLUEPRINT ITEM</label>
         <input
           id="new-pallet-id"
           type="text"
-          placeholder="e.g. PALLET-C1"
+          placeholder="e.g. DESK-C1"
           value={newSlotId}
           onChange={(e) => setNewSlotId(e.target.value)}
           className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-amber-200 focus:outline-none focus:border-amber-400"
         />
 
-        {isPlacingPallet ? (
+        <label htmlFor="floor-item-type" className="text-xs text-gray-400 font-mono block">ITEM TYPE</label>
+        <select
+          id="floor-item-type"
+          value={itemType}
+          onChange={(e) => setItemType(e.target.value as FloorItemType)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-amber-400"
+        >
+          {FLOOR_ITEM_TYPES.map((type) => (
+            <option key={type} value={type}>{FLOOR_ITEM_LABELS[type]}</option>
+          ))}
+        </select>
+
+        {isPlacingItem ? (
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-amber-200">Click-drag across empty grid cells, then release.</p>
             <button
@@ -66,22 +88,22 @@ export default function AdminPanel({
           </button>
         )}
 
-        {pendingFootprint && !isPlacingPallet && (
+        {pendingFootprint && !isPlacingItem && (
           <div className={`rounded border p-2 text-xs ${placementAvailable ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-rose-700 bg-rose-950/40 text-rose-200"}`}>
             <p>
-              {pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
+              {FLOOR_ITEM_LABELS[itemType]}: {pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
               {placementAvailable ? " selected" : " overlaps another pallet or is out of bounds"}
             </p>
           </div>
         )}
 
-        {pendingFootprint && !isPlacingPallet && (
+        {pendingFootprint && !isPlacingItem && (
           <button
             type="submit"
             disabled={!newSlotId.trim() || !placementAvailable}
             className="w-full rounded bg-amber-500 px-3 py-2 text-sm font-bold text-gray-950 transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Create pallet
+            Create {FLOOR_ITEM_LABELS[itemType].toLowerCase()}
           </button>
         )}
       </form>
@@ -89,7 +111,7 @@ export default function AdminPanel({
       {selectedSlot && (
         // key resets the rename field whenever a different zone is selected
         <div key={selectedSlot.id} className="pt-4 border-t border-gray-700 space-y-2">
-          <label className="text-xs text-gray-400 font-mono block">RENAME SELECTED ZONE ID</label>
+          <label className="text-xs text-gray-400 font-mono block">RENAME SELECTED ITEM</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -109,11 +131,8 @@ export default function AdminPanel({
       )}
 
       <div className="bg-gray-900/60 p-3 rounded border border-gray-700 text-[11px] text-gray-400 leading-relaxed space-y-1">
-        <p className="font-bold text-amber-300">💡 Snapping Controls Active:</p>
-        <p>
-          Zone slots now align to an **automatic grid snapping step matrix** when dragged. Select any item to edit its
-          name identifier label directly.
-        </p>
+        <p className="font-bold text-amber-300">Blueprint placement</p>
+        <p>Choose an item type, then drag across empty cells to set its size and position.</p>
       </div>
     </div>
   );

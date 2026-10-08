@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PhysicalPallet, type BayId, type GridFootprint } from "./types";
+import { PhysicalPallet, type BayId, type FloorItemType, type GridFootprint } from "./types";
 import { fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, getPositionForFootprint, type CanvasSize } from "./layoutPositions";
 
@@ -11,7 +11,7 @@ export function useFloorLayout() {
   const [activeBay, setActiveBay] = useState<BayId>("bay3");
   const [searchQuery, setSearchQuery] = useState("");
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
-  const [isPlacingPallet, setIsPlacingPallet] = useState(false);
+  const [isPlacingItem, setIsPlacingItem] = useState(false);
   const [pendingFootprint, setPendingFootprint] = useState<GridFootprint | null>(null);
   const activeSlots = slots.filter((slot) => slot.bayId === activeBay);
   const placementAvailable = pendingFootprint
@@ -22,7 +22,7 @@ export function useFloorLayout() {
     setActiveBay(bay);
     setSelectedSlot(null);
     setPendingFootprint(null);
-    setIsPlacingPallet(false);
+    setIsPlacingItem(false);
   };
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function useFloorLayout() {
     setIsAdminMode((prev) => !prev);
     setSelectedSlot(null);
     setPendingFootprint(null);
-    setIsPlacingPallet(false);
+    setIsPlacingItem(false);
   };
 
   const saveDetails = async (projectId: string, notes: string) => {
@@ -68,7 +68,7 @@ export function useFloorLayout() {
     await postSlot({ ...renamed, action: "rename", oldId: selectedSlot.id });
   };
 
-  const createZone = async (newId: string, footprint: GridFootprint) => {
+  const createZone = async (newId: string, itemType: FloorItemType, footprint: GridFootprint) => {
     if (!newId.trim()) return false;
     const finalId = newId.trim().toUpperCase();
 
@@ -86,6 +86,7 @@ export function useFloorLayout() {
     const brandNew: PhysicalPallet = {
       id: finalId,
       bayId: activeBay,
+      itemType,
       widthCells: footprint.widthCells,
       heightCells: footprint.heightCells,
       isOccupied: false,
@@ -96,7 +97,7 @@ export function useFloorLayout() {
     setSlots((prev) => [...prev, brandNew]);
     setSelectedSlot(brandNew);
     setPendingFootprint(null);
-    setIsPlacingPallet(false);
+    setIsPlacingItem(false);
 
     await postSlot({ ...brandNew, action: "create" });
     return true;
@@ -121,13 +122,17 @@ export function useFloorLayout() {
 
   const movePallet = async (sourceId: string, targetSlot: PhysicalPallet) => {
     if (sourceId === targetSlot.id) return;
+    if (targetSlot.itemType !== "pallet") return;
     if (targetSlot.isOccupied) {
       alert("Allocation Collision: This location slot already has an active inventory pallet block!");
       return;
     }
 
     const sourceSlot = slots.find((s) => s.id === sourceId);
-    if (!sourceSlot || !sourceSlot.isOccupied || sourceSlot.bayId !== activeBay || targetSlot.bayId !== activeBay) return;
+    if (
+      !sourceSlot || sourceSlot.itemType !== "pallet" || !sourceSlot.isOccupied ||
+      sourceSlot.bayId !== activeBay || targetSlot.bayId !== activeBay
+    ) return;
 
     const newTarget = {
       ...targetSlot,
@@ -155,21 +160,21 @@ export function useFloorLayout() {
     activeBay,
     activeSlots,
     searchQuery,
-    isPlacingPallet,
+    isPlacingItem,
     pendingFootprint,
     placementAvailable,
     setCanvasSize,
     setSearchQuery,
     setPendingFootprint,
-    startPalletPlacement: () => {
+    startItemPlacement: () => {
       setPendingFootprint(null);
-      setIsPlacingPallet(true);
+      setIsPlacingItem(true);
     },
     cancelPalletPlacement: () => {
       setPendingFootprint(null);
-      setIsPlacingPallet(false);
+      setIsPlacingItem(false);
     },
-    finishPalletPlacement: () => setIsPlacingPallet(false),
+    finishItemPlacement: () => setIsPlacingItem(false),
     selectSlot: setSelectedSlot,
     selectBay,
     toggleAdminMode,

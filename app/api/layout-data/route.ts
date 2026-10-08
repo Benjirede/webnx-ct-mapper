@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import db from "@/app/lib/db";
 import { getBayGridSize } from "@/app/components/floor-grid/layoutPositions";
-import { isBayId } from "@/app/components/floor-grid/types";
+import { isBayId, isFloorItemType } from "@/app/components/floor-grid/types";
 
 const SECRET_ADMIN_PIN = "1234";
 
@@ -20,6 +20,7 @@ export async function GET() {
     const formattedSlots = slots.map((slot) => ({
       id: slot.id,
       bayId: slot.bay_id || "bay1",
+      itemType: slot.item_type || "pallet",
       isOccupied: slot.is_occupied === 1,
       projectId: slot.project_id || "",
       notes: slot.notes || "",
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
         if (!source || !target) return { status: 404, msg: "One or both layout location target bounds missing" };
         if (source.is_occupied === 0) return { status: 400, msg: "Origin empty" };
         if (target.is_occupied === 1) return { status: 400, msg: "Destination blocked" };
+        if (source.item_type !== "pallet" || target.item_type !== "pallet") {
+          return { status: 400, msg: "Inventory can only move between pallet items" };
+        }
 
         db.prepare('UPDATE pallet_slots SET is_occupied = 0, project_id = "", notes = "", occupied_since = NULL, version = version + 1, updated_at = ? WHERE id = ?').run(systemTime, sourceId);
         db.prepare('UPDATE pallet_slots SET is_occupied = 1, project_id = ?, notes = ?, occupied_since = ?, version = version + 1, updated_at = ? WHERE id = ?').run(source.project_id, source.notes, source.occupied_since || systemTime, systemTime, targetId);
@@ -97,9 +101,11 @@ export async function POST(request: Request) {
       const x = body.xPos ?? 50.0;
       const y = body.yPos ?? 50.0;
       const assignedBay = body.bayId || "bay1";
+      const itemType = body.itemType || "pallet";
       const widthCells = body.widthCells ?? 1;
       const heightCells = body.heightCells ?? 1;
       if (!isBayId(assignedBay)) return NextResponse.json({ error: "Invalid bay" }, { status: 400 });
+      if (!isFloorItemType(itemType)) return NextResponse.json({ error: "Invalid floor item type" }, { status: 400 });
       const bayGridSize = getBayGridSize(assignedBay);
       if (
         !Number.isInteger(widthCells) || !Number.isInteger(heightCells) ||
@@ -121,8 +127,8 @@ export async function POST(request: Request) {
           }
 
           db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(oldZoneId);
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(targetId, originalRecord.bay_id, originalRecord.is_occupied, originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1, originalRecord.width_cells || 1, originalRecord.height_cells || 1, originalRecord.occupied_since, systemTime);
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(targetId, originalRecord.bay_id, originalRecord.item_type || "pallet", originalRecord.is_occupied, originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1, originalRecord.width_cells || 1, originalRecord.height_cells || 1, originalRecord.occupied_since, systemTime);
 
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "RENAMED", ?, ?, ?)')
             .run(targetId, JSON.stringify({ id: oldZoneId }), JSON.stringify({ id: targetId }), systemTime);
@@ -136,10 +142,10 @@ export async function POST(request: Request) {
 
       try {
         db.transaction(() => {
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
-            .run(targetId, assignedBay, x, y, widthCells, heightCells, systemTime);
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
+            .run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "CREATED", NULL, ?, ?)')
-            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, x, y, widthCells, heightCells }), systemTime);
+            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), systemTime);
         })();
         return NextResponse.json({ success: true });
       } catch (e) {

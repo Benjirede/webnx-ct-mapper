@@ -13,9 +13,38 @@ export interface GridFootprint {
   heightCells: number;
 }
 
+export const FLOOR_ITEM_TYPES = [
+  "pallet",
+  "walking-lane",
+  "desk",
+  "shelf",
+  "rack",
+  "island",
+  "workbench",
+  "other",
+] as const;
+
+export type FloorItemType = (typeof FLOOR_ITEM_TYPES)[number];
+
+export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
+  pallet: "Pallet",
+  "walking-lane": "Walking lane",
+  desk: "Desk",
+  shelf: "Shelf",
+  rack: "Pallet rack",
+  island: "Island",
+  workbench: "Workbench",
+  other: "Other landmark",
+};
+
+export function isFloorItemType(value: unknown): value is FloorItemType {
+  return typeof value === "string" && (FLOOR_ITEM_TYPES as readonly string[]).includes(value);
+}
+
 export interface PhysicalPallet {
   id: string;
   bayId: BayId;
+  itemType: FloorItemType;
   widthCells: number;
   heightCells: number;
   isOccupied: boolean;

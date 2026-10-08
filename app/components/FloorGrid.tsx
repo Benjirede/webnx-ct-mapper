@@ -31,11 +31,11 @@ export default function FloorGrid() {
           onPalletDrop={layout.movePallet}
           onZoneMove={layout.moveZone}
           onCanvasSizeChange={layout.setCanvasSize}
-          isPlacingPallet={layout.isPlacingPallet}
-          pendingFootprint={layout.pendingFootprint}
-          placementAvailable={layout.placementAvailable}
-          onFootprintChange={layout.setPendingFootprint}
-          onFinishPlacement={layout.finishPalletPlacement}
+            isPlacingItem={layout.isPlacingItem}
+            pendingFootprint={layout.pendingFootprint}
+            placementAvailable={layout.placementAvailable}
+            onFootprintChange={layout.setPendingFootprint}
+            onFinishPlacement={layout.finishItemPlacement}
         />
 
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl h-fit flex flex-col space-y-4">
@@ -43,12 +43,12 @@ export default function FloorGrid() {
             <AdminPanel
               key={selectedSlot?.id ?? "none"}
               selectedSlot={selectedSlot}
-              isPlacingPallet={layout.isPlacingPallet}
+              onCreate={layout.createZone}
+              isPlacingItem={layout.isPlacingItem}
               pendingFootprint={layout.pendingFootprint}
               placementAvailable={layout.placementAvailable}
-              onStartPlacement={layout.startPalletPlacement}
+              onStartPlacement={layout.startItemPlacement}
               onCancelPlacement={layout.cancelPalletPlacement}
-              onCreate={layout.createZone}
               onRename={layout.renameZone}
             />
           ) : (

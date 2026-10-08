@@ -18,6 +18,7 @@ db.exec(`
     x_pos REAL NOT NULL,
     y_pos REAL NOT NULL,
     version INTEGER DEFAULT 1,
+    item_type TEXT NOT NULL DEFAULT 'pallet',
     width_cells INTEGER NOT NULL DEFAULT 1,
     height_cells INTEGER NOT NULL DEFAULT 1,
     occupied_since TEXT,
@@ -63,6 +64,15 @@ if (
       db.exec('ALTER TABLE pallet_slots ADD COLUMN height_cells INTEGER NOT NULL DEFAULT 1');
     }
     db.pragma('user_version = 4');
+  })();
+}
+
+if (currentVersion < 5 || !palletSlotColumns.has('item_type')) {
+  db.transaction(() => {
+    if (!palletSlotColumns.has('item_type')) {
+      db.exec("ALTER TABLE pallet_slots ADD COLUMN item_type TEXT NOT NULL DEFAULT 'pallet'");
+    }
+    db.pragma('user_version = 5');
   })();
 }
 
