@@ -7,12 +7,12 @@
 .slotButton {
   position: relative;
   display: flex;
-  width: 5rem;
-  height: 4rem;
+  width: 4rem;
+  height: 3rem;
   flex-direction: column;
   justify-content: space-between;
   border-style: solid;
-  border-width: 1px;
+  border-width: 0.5px;
   border-radius: 0.375rem;
   padding: 0.5rem;
   text-align: left;

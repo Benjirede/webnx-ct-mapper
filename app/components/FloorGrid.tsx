@@ -11,7 +11,7 @@ export default function FloorGrid() {
   const { selectedSlot, isAdminMode } = layout;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto bg-gray-900 text-white min-h-screen flex flex-col">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto bg-gray-900 text-white min-h-screen flex flex-col">
       <FloorHeader
         isAdminMode={isAdminMode}
         searchQuery={layout.searchQuery}
@@ -31,6 +31,11 @@ export default function FloorGrid() {
           onPalletDrop={layout.movePallet}
           onZoneMove={layout.moveZone}
           onCanvasSizeChange={layout.setCanvasSize}
+          isPlacingPallet={layout.isPlacingPallet}
+          pendingFootprint={layout.pendingFootprint}
+          placementAvailable={layout.placementAvailable}
+          onFootprintChange={layout.setPendingFootprint}
+          onFinishPlacement={layout.finishPalletPlacement}
         />
 
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl h-fit flex flex-col space-y-4">
@@ -38,6 +43,11 @@ export default function FloorGrid() {
             <AdminPanel
               key={selectedSlot?.id ?? "none"}
               selectedSlot={selectedSlot}
+              isPlacingPallet={layout.isPlacingPallet}
+              pendingFootprint={layout.pendingFootprint}
+              placementAvailable={layout.placementAvailable}
+              onStartPlacement={layout.startPalletPlacement}
+              onCancelPlacement={layout.cancelPalletPlacement}
               onCreate={layout.createZone}
               onRename={layout.renameZone}
             />

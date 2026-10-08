@@ -6,9 +6,18 @@ export function isBayId(value: unknown): value is BayId {
   return typeof value === "string" && (BAY_IDS as readonly string[]).includes(value);
 }
 
+export interface GridFootprint {
+  column: number;
+  row: number;
+  widthCells: number;
+  heightCells: number;
+}
+
 export interface PhysicalPallet {
   id: string;
   bayId: BayId;
+  widthCells: number;
+  heightCells: number;
   isOccupied: boolean;
   projectId: string;
   notes: string;

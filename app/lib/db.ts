@@ -18,6 +18,8 @@ db.exec(`
     x_pos REAL NOT NULL,
     y_pos REAL NOT NULL,
     version INTEGER DEFAULT 1,
+    width_cells INTEGER NOT NULL DEFAULT 1,
+    height_cells INTEGER NOT NULL DEFAULT 1,
     occupied_since TEXT,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
@@ -42,6 +44,25 @@ if (currentVersion < 3) {
       // Column exists, proceed cleanly
     }
     db.pragma('user_version = 3');
+  })();
+}
+
+const palletSlotColumns = new Set(
+  (db.prepare('PRAGMA table_info(pallet_slots)').all() as Array<{ name: string }>).map(({ name }) => name)
+);
+if (
+  currentVersion < 4 ||
+  !palletSlotColumns.has('width_cells') ||
+  !palletSlotColumns.has('height_cells')
+) {
+  db.transaction(() => {
+    if (!palletSlotColumns.has('width_cells')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN width_cells INTEGER NOT NULL DEFAULT 1');
+    }
+    if (!palletSlotColumns.has('height_cells')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN height_cells INTEGER NOT NULL DEFAULT 1');
+    }
+    db.pragma('user_version = 4');
   })();
 }
 

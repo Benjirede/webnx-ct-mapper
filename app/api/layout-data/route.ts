@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import db from "@/app/lib/db";
+import { getBayGridSize } from "@/app/components/floor-grid/layoutPositions";
+import { isBayId } from "@/app/components/floor-grid/types";
 
 const SECRET_ADMIN_PIN = "1234";
 
@@ -23,6 +25,8 @@ export async function GET() {
       notes: slot.notes || "",
       xPos: slot.x_pos,
       yPos: slot.y_pos,
+      widthCells: slot.width_cells ?? 1,
+      heightCells: slot.height_cells ?? 1,
       version: slot.version,
       occupiedSince: slot.occupied_since,
       updatedAt: slot.updated_at
@@ -89,10 +93,21 @@ export async function POST(request: Request) {
     // ------------------------------------------------------------------------
     // SUB-ROUTING INTENT B: BLUEPRINT CREATION / RENAME (GUARDED)
     // ------------------------------------------------------------------------
-    if (body.action === "create") {
+    if (body.action === "create" || body.action === "rename") {
       const x = body.xPos ?? 50.0;
       const y = body.yPos ?? 50.0;
       const assignedBay = body.bayId || "bay1";
+      const widthCells = body.widthCells ?? 1;
+      const heightCells = body.heightCells ?? 1;
+      if (!isBayId(assignedBay)) return NextResponse.json({ error: "Invalid bay" }, { status: 400 });
+      const bayGridSize = getBayGridSize(assignedBay);
+      if (
+        !Number.isInteger(widthCells) || !Number.isInteger(heightCells) ||
+        widthCells < 1 || widthCells > bayGridSize.columns ||
+        heightCells < 1 || heightCells > bayGridSize.rows
+      ) {
+        return NextResponse.json({ error: "Invalid pallet footprint" }, { status: 400 });
+      }
 
       if (body.oldId) {
         const oldZoneId = body.oldId.trim().toUpperCase();
@@ -106,8 +121,8 @@ export async function POST(request: Request) {
           }
 
           db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(oldZoneId);
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, occupied_since, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(targetId, originalRecord.bay_id, originalRecord.is_occupied, originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1, originalRecord.occupied_since, systemTime);
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(targetId, originalRecord.bay_id, originalRecord.is_occupied, originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1, originalRecord.width_cells || 1, originalRecord.height_cells || 1, originalRecord.occupied_since, systemTime);
 
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "RENAMED", ?, ?, ?)')
             .run(targetId, JSON.stringify({ id: oldZoneId }), JSON.stringify({ id: targetId }), systemTime);
@@ -121,10 +136,10 @@ export async function POST(request: Request) {
 
       try {
         db.transaction(() => {
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, updated_at) VALUES (?, ?, 0, "", "", ?, ?, 1, ?)')
-            .run(targetId, assignedBay, x, y, systemTime);
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
+            .run(targetId, assignedBay, x, y, widthCells, heightCells, systemTime);
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "CREATED", NULL, ?, ?)')
-            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, x, y }), systemTime);
+            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, x, y, widthCells, heightCells }), systemTime);
         })();
         return NextResponse.json({ success: true });
       } catch (e) {

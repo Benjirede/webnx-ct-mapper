@@ -1,4 +1,5 @@
 import { PhysicalPallet } from "./types";
+import { CELL_HEIGHT, CELL_WIDTH } from "./layoutPositions";
 import styles from "./PalletSlot.module.css";
 
 interface Props {
@@ -6,11 +7,12 @@ interface Props {
   isAdminMode: boolean;
   isSelected: boolean;
   matchesSearch: boolean;
+  scale: number;
   onSelect: (slot: PhysicalPallet) => void;
   onPalletDrop: (sourceId: string, target: PhysicalPallet) => void;
 }
 
-export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearch, onSelect, onPalletDrop }: Props) {
+export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearch, scale, onSelect, onPalletDrop }: Props) {
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/source-id", slot.id);
     e.dataTransfer.setData("text/drag-type", isAdminMode ? "move-zone" : "move-payload");
@@ -26,7 +28,11 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
 
   return (
     <div
-      style={{ left: `${slot.xPos}%`, top: `${slot.yPos}%` }}
+      style={{
+        left: `${slot.xPos}%`,
+        top: `${slot.yPos}%`,
+        ...(scale === 1 ? {} : { transform: `translate(-50%, -50%) scale(${scale})` }),
+      }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
       className={styles.positioner}
@@ -35,6 +41,10 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
         onClick={() => onSelect(slot)}
         draggable={isAdminMode || slot.isOccupied}
         onDragStart={handleDragStart}
+        style={{
+          width: `${Math.max(32, slot.widthCells * CELL_WIDTH - 8)}px`,
+          height: `${Math.max(28, slot.heightCells * CELL_HEIGHT - 8)}px`,
+        }}
         className={`${styles.slotButton} shadow-lg ${
           isAdminMode
             ? "bg-gray-900 border-amber-500 text-amber-300 cursor-move border-dashed hover:border-amber-400"

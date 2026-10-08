@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { PhysicalPallet, type BayId } from "./types";
+import { PhysicalPallet, type BayId, type GridFootprint } from "./types";
 import { fetchLayout, postSlot } from "./api";
-import { findNearestOpenPosition, type CanvasSize } from "./layoutPositions";
+import { findNearestOpenPosition, getPositionForFootprint, type CanvasSize } from "./layoutPositions";
 
 export function useFloorLayout() {
   const [slots, setSlots] = useState<PhysicalPallet[]>([]);
@@ -11,11 +11,18 @@ export function useFloorLayout() {
   const [activeBay, setActiveBay] = useState<BayId>("bay3");
   const [searchQuery, setSearchQuery] = useState("");
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
+  const [isPlacingPallet, setIsPlacingPallet] = useState(false);
+  const [pendingFootprint, setPendingFootprint] = useState<GridFootprint | null>(null);
   const activeSlots = slots.filter((slot) => slot.bayId === activeBay);
+  const placementAvailable = pendingFootprint
+    ? Boolean(getPositionForFootprint(activeSlots, activeBay, pendingFootprint))
+    : false;
 
   const selectBay = (bay: BayId) => {
     setActiveBay(bay);
     setSelectedSlot(null);
+    setPendingFootprint(null);
+    setIsPlacingPallet(false);
   };
 
   useEffect(() => {
@@ -28,6 +35,8 @@ export function useFloorLayout() {
   const toggleAdminMode = () => {
     setIsAdminMode((prev) => !prev);
     setSelectedSlot(null);
+    setPendingFootprint(null);
+    setIsPlacingPallet(false);
   };
 
   const saveDetails = async (projectId: string, notes: string) => {
@@ -59,7 +68,7 @@ export function useFloorLayout() {
     await postSlot({ ...renamed, action: "rename", oldId: selectedSlot.id });
   };
 
-  const createZone = async (newId: string) => {
+  const createZone = async (newId: string, footprint: GridFootprint) => {
     if (!newId.trim()) return false;
     const finalId = newId.trim().toUpperCase();
 
@@ -68,15 +77,17 @@ export function useFloorLayout() {
       return false;
     }
 
-    const position = findNearestOpenPosition(activeSlots, canvasSize, 50, 50);
+    const position = getPositionForFootprint(activeSlots, activeBay, footprint);
     if (!position) {
-      alert("No open pallet-sized location is available on the floor layout.");
+      alert("That pallet footprint is out of bounds or overlaps an existing slot.");
       return false;
     }
 
     const brandNew: PhysicalPallet = {
       id: finalId,
       bayId: activeBay,
+      widthCells: footprint.widthCells,
+      heightCells: footprint.heightCells,
       isOccupied: false,
       projectId: "",
       notes: "",
@@ -84,6 +95,8 @@ export function useFloorLayout() {
     };
     setSlots((prev) => [...prev, brandNew]);
     setSelectedSlot(brandNew);
+    setPendingFootprint(null);
+    setIsPlacingPallet(false);
 
     await postSlot({ ...brandNew, action: "create" });
     return true;
@@ -94,7 +107,7 @@ export function useFloorLayout() {
     const target = slots.find((s) => s.id === sourceId);
     if (!target || target.bayId !== activeBay) return;
 
-    const position = findNearestOpenPosition(activeSlots, canvasSize, xPct, yPct, sourceId);
+    const position = findNearestOpenPosition(activeSlots, canvasSize, activeBay, xPct, yPct, sourceId, target);
     if (!position) {
       alert("No open pallet-sized location is available on the floor layout.");
       return;
@@ -142,8 +155,21 @@ export function useFloorLayout() {
     activeBay,
     activeSlots,
     searchQuery,
+    isPlacingPallet,
+    pendingFootprint,
+    placementAvailable,
     setCanvasSize,
     setSearchQuery,
+    setPendingFootprint,
+    startPalletPlacement: () => {
+      setPendingFootprint(null);
+      setIsPlacingPallet(true);
+    },
+    cancelPalletPlacement: () => {
+      setPendingFootprint(null);
+      setIsPlacingPallet(false);
+    },
+    finishPalletPlacement: () => setIsPlacingPallet(false),
     selectSlot: setSelectedSlot,
     selectBay,
     toggleAdminMode,
