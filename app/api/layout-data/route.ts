@@ -57,27 +57,54 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Source and Target fields are required" }, { status: 400 });
       }
 
-      const atomicMovementTx = db.transaction(() => {
-        const source = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(sourceId) as any;
-        const target = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(targetId) as any;
+      // Step 1: Record lookup validation checks synchronously OUTSIDE the transaction wrapper
+      const source = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(sourceId) as any;
+      const target = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(targetId) as any;
 
-        if (!source || !target) return { status: 404, msg: "One or both layout location target bounds missing" };
-        if (source.is_occupied === 0) return { status: 400, msg: "Origin empty" };
-        if (target.is_occupied === 1) return { status: 400, msg: "Destination blocked" };
-        if (source.item_type !== "pallet" || target.item_type !== "pallet") {
-          return { status: 400, msg: "Inventory can only move between pallet items" };
-        }
+      if (!source || !target) {
+        return NextResponse.json({ error: "One or both layout location target bounds missing" }, { status: 404 });
+      }
+      if (source.is_occupied === 0 || source.is_occupied === false) {
+        return NextResponse.json({ error: "Origin empty" }, { status: 400 });
+      }
+      if (target.is_occupied === 1 || target.is_occupied === true) {
+        return NextResponse.json({ error: "Destination blocked" }, { status: 400 });
+      }
 
-        db.prepare('UPDATE pallet_slots SET is_occupied = 0, project_id = "", notes = "", occupied_since = NULL, version = version + 1, updated_at = ? WHERE id = ?').run(systemTime, sourceId);
-        db.prepare('UPDATE pallet_slots SET is_occupied = 1, project_id = ?, notes = ?, occupied_since = ?, version = version + 1, updated_at = ? WHERE id = ?').run(source.project_id, source.notes, source.occupied_since || systemTime, systemTime, targetId);
-        db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "MOVED_PALLET", ?, ?, ?)').run(source.project_id || "UNKNOWN", JSON.stringify({ from: sourceId }), JSON.stringify({ to: targetId }), systemTime);
+      // Safeguard fallback layer for unseeded item types
+      const sourceItem = source.itemType || source.item_type || "pallet";
+      const targetItem = target.itemType || target.item_type || "pallet";
 
-        return { status: 200 };
-      });
+      if (sourceItem !== "pallet" || targetItem !== "pallet") {
+        return NextResponse.json({ error: "Inventory can only move between pallet items" }, { status: 400 });
+      }
 
-      const txResult = atomicMovementTx();
-      if (txResult.status !== 200) return NextResponse.json({ error: txResult.msg }, { status: txResult.status });
-      return NextResponse.json({ success: true });
+      // Step 2: Execute database mutations against the exact snake_case database table structures
+      try {
+        db.transaction(() => {
+          // Clear source slot parameters using exact database snake_case columns
+          db.prepare("UPDATE pallet_slots SET is_occupied = 0, project_id = '', notes = '', occupied_since = NULL, version = version + 1, updated_at = ? WHERE id = ?")
+            .run(systemTime, sourceId);
+            
+          // Populate target slot parameters with source history data using exact database snake_case columns
+          db.prepare('UPDATE pallet_slots SET is_occupied = 1, project_id = ?, notes = ?, occupied_since = ?, version = version + 1, updated_at = ? WHERE id = ?')
+            .run(source.project_id, source.notes, source.occupied_since || systemTime, systemTime, targetId);
+            
+          // FIXED: Wrapped the SQL query in double-quotes so internal text values use standard single-quotes
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'MOVED_PALLET', ?, ?, ?)")
+            .run(
+              sourceId, 
+              JSON.stringify({ projectId: source.project_id, notes: source.notes }), 
+              JSON.stringify({ movedTo: targetId }), 
+              systemTime
+            );
+
+        })();
+
+        return NextResponse.json({ success: true });
+      } catch (txError: any) {
+        return NextResponse.json({ error: txError.message }, { status: 500 });
+      }
     }
     
     // ------------------------------------------------------------------------
@@ -130,7 +157,7 @@ export async function POST(request: Request) {
           db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             .run(targetId, originalRecord.bay_id, originalRecord.item_type || "pallet", originalRecord.is_occupied, originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1, originalRecord.width_cells || 1, originalRecord.height_cells || 1, originalRecord.occupied_since, systemTime);
 
-          db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "RENAMED", ?, ?, ?)')
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'RENAMED', ?, ?, ?)")
             .run(targetId, JSON.stringify({ id: oldZoneId }), JSON.stringify({ id: targetId }), systemTime);
 
           return { status: 200 };
@@ -144,7 +171,7 @@ export async function POST(request: Request) {
         db.transaction(() => {
           db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
             .run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
-          db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "CREATED", NULL, ?, ?)')
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'CREATED', NULL, ?, ?)")
             .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), systemTime);
         })();
         return NextResponse.json({ success: true });

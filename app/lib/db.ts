@@ -1,8 +1,11 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
-// Force path resolution globally within a universally visible directory
-const dbPath = path.resolve(process.cwd(), 'webnx_floor.db');
+let dbPath = process.env.DATABASE_URL;
+if (!dbPath) {
+  dbPath = path.resolve(process.cwd(), 'webnx_floor.db');
+}
+
 const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');

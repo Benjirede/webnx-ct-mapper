@@ -1,0 +1,5 @@
+.next
+.git
+webnx_floor.db
+webnx_floor.db-wal
+webnx_floor.db-shm
