@@ -208,7 +208,7 @@ export async function DELETE(request: Request) {
     const executionResult = db.transaction(() => {
       const activeRecord = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(targetId) as any;
       if (!activeRecord) return { status: 404, error: "Zone not found" };
-      if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied" };
+      if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied, please remove Project Name and any Pallet Info" };
 
       db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(targetId);
       db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, NULL, ?)')

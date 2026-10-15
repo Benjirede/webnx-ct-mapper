@@ -41,105 +41,126 @@ export default function AdminPanel({
   };
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-md font-mono font-bold text-amber-400 uppercase tracking-wider border-b border-gray-700 pb-2">
-        🛠️ Blueprint Control Deck
-      </h2>
+    <div className="space-y-6">
+      <header className="border-b border-gray-700 pb-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Layout Controls</p>
+        <h2 className="mt-1 text-lg font-semibold text-gray-100">Add Floor Item</h2>
+      </header>
 
-      <form onSubmit={handleCreate} className="space-y-2">
-        <label htmlFor="new-pallet-id" className="text-xs text-gray-400 font-mono block">ADD BLUEPRINT ITEM</label>
-        <input
-          id="new-pallet-id"
-          type="text"
-          placeholder="e.g. DESK-C1"
-          value={newSlotId}
-          onChange={(e) => setNewSlotId(e.target.value)}
-          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-amber-200 focus:outline-none focus:border-amber-400"
-        />
+      <section aria-labelledby="add-item-title" className="space-y-4">
+        <div>
+          <p className="mt-1 text-xs text-gray-400">Enter an ID and type of floor item to add. Then select the space to take up on the floor.</p>
+        </div>
 
-        <label htmlFor="floor-item-type" className="text-xs text-gray-400 font-mono block">ITEM TYPE</label>
-        <select
-          id="floor-item-type"
-          value={itemType}
-          onChange={(e) => setItemType(e.target.value as FloorItemType)}
-          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-amber-400"
-        >
-          {FLOOR_ITEM_TYPES.map((type) => (
-            <option key={type} value={type}>{FLOOR_ITEM_LABELS[type]}</option>
-          ))}
-        </select>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="new-pallet-id" className="block text-xs font-medium text-gray-300">Item ID</label>
+            <input
+              id="new-pallet-id"
+              type="text"
+              placeholder="e.g. DESK-C1"
+              value={newSlotId}
+              onChange={(e) => setNewSlotId(e.target.value)}
+              className="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-500 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+            />
+          </div>
 
-        {isPlacingItem ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-amber-200">Click-drag across empty grid cells, then release.</p>
+          <div className="space-y-1.5">
+            <label htmlFor="floor-item-type" className="block text-xs font-medium text-gray-300">Item type</label>
+            <select
+              id="floor-item-type"
+              value={itemType}
+              onChange={(e) => setItemType(e.target.value as FloorItemType)}
+              className="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-gray-100 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+            >
+              {FLOOR_ITEM_TYPES.map((type) => (
+                <option key={type} value={type}>{FLOOR_ITEM_LABELS[type]}</option>
+              ))}
+            </select>
+          </div>
+
+          {isPlacingItem ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span aria-hidden="true" className="size-2 shrink-0 animate-pulse rounded-full bg-amber-300" />
+                <span className="text-sm font-medium text-amber-100">Placement active</span>
+              </div>
+              <button
+                type="button"
+                onClick={onCancelPlacement}
+                className="shrink-0 rounded border border-amber-300/30 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={onCancelPlacement}
-              className="shrink-0 rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700"
+              onClick={onStartPlacement}
+              disabled={!newSlotId.trim()}
+              className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2.5 text-sm font-semibold text-gray-100 transition-colors hover:border-amber-400/70 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Cancel
+              Set footprint on floor
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onStartPlacement}
-            disabled={!newSlotId.trim()}
-            className="w-full rounded border border-amber-500/60 px-3 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Choose footprint on floor
-          </button>
-        )}
+          )}
 
-        {pendingFootprint && !isPlacingItem && (
-          <div className={`rounded border p-2 text-xs ${placementAvailable ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-rose-700 bg-rose-950/40 text-rose-200"}`}>
-            <p>
-              {FLOOR_ITEM_LABELS[itemType]}: {pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
-              {placementAvailable ? " selected" : " overlaps another pallet or is out of bounds"}
-            </p>
-          </div>
-        )}
+          {pendingFootprint && !isPlacingItem && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`rounded-md border px-3 py-2.5 ${placementAvailable ? "border-emerald-700/70 bg-emerald-950/40" : "border-rose-700/70 bg-rose-950/40"}`}
+            >
+              <p className={`text-sm font-semibold ${placementAvailable ? "text-emerald-200" : "text-rose-200"}`}>
+                {placementAvailable ? "Footprint ready" : "Footprint unavailable"}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-300">
+                {FLOOR_ITEM_LABELS[itemType]} · {pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
+                {!placementAvailable && " · Overlaps an item or is out of bounds"}
+              </p>
+            </div>
+          )}
 
-        {pendingFootprint && !isPlacingItem && (
-          <button
-            type="submit"
-            disabled={!newSlotId.trim() || !placementAvailable}
-            className="w-full rounded bg-amber-500 px-3 py-2 text-sm font-bold text-gray-950 transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Create {FLOOR_ITEM_LABELS[itemType].toLowerCase()}
-          </button>
-        )}
-      </form>
+          {pendingFootprint && !isPlacingItem && (
+            <button
+              type="submit"
+              disabled={!newSlotId.trim() || !placementAvailable}
+              className="w-full rounded-md bg-amber-400 px-3 py-2.5 text-sm font-semibold text-gray-950 transition-colors hover:bg-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Create {FLOOR_ITEM_LABELS[itemType].toLowerCase()}
+            </button>
+          )}
+        </form>
+      </section>
 
       {selectedSlot && (
         // key resets the rename field whenever a different zone is selected
-        <div key={selectedSlot.id} className="pt-4 border-t border-gray-700 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs text-gray-400 font-mono block">RENAME SELECTED ITEM</label>
+        <section key={selectedSlot.id} aria-labelledby="selected-item-title" className="space-y-3 border-t border-gray-700 pt-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Selected item</p>
+              <h3 id="selected-item-title" className="mt-0.5 truncate text-sm font-semibold text-gray-100">{selectedSlot.id}</h3>
+            </div>
             <DeleteItemButton itemId={selectedSlot.id} onDelete={onDelete} />
           </div>
           <div className="flex gap-2">
+            <label htmlFor="rename-item-id" className="sr-only">New item ID</label>
             <input
+              id="rename-item-id"
               type="text"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
-              className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-emerald-300 focus:outline-none focus:border-amber-400"
+              className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
             />
             <button
               type="button"
               onClick={() => onRename(renameValue)}
-              className="bg-emerald-500 text-gray-950 font-bold px-3 rounded text-xs hover:bg-emerald-600 transition-colors"
+              className="rounded-md border border-gray-600 px-3 py-2 text-sm font-semibold text-gray-100 transition-colors hover:border-emerald-400/70 hover:bg-emerald-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
             >
-              Save
+              Rename
             </button>
           </div>
-        </div>
+        </section>
       )}
-
-      <div className="bg-gray-900/60 p-3 rounded border border-gray-700 text-[11px] text-gray-400 leading-relaxed space-y-1">
-        <p className="font-bold text-amber-300">Blueprint placement</p>
-        <p>Choose an item type, then drag across empty cells to set its size and position.</p>
-      </div>
     </div>
   );
 }

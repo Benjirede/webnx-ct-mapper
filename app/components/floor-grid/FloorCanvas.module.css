@@ -20,6 +20,7 @@
   height: min(72dvh, 720px);
   scrollbar-width: none;
   touch-action: none;
+  padding-bottom: 4rem;
 }
 
 .fullscreenSection:fullscreen .viewport {

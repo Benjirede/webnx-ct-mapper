@@ -16,7 +16,7 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <span className="text-xs text-gray-400 font-mono block">LOCATION SLOT</span>
+          <span className="text-xs text-gray-400 font-mono block">Pallet ID</span>
           <p className="text-xl font-bold text-emerald-400">{slot.id}</p>
         </div>
         <DeleteItemButton itemId={slot.id} onDelete={onDelete} />
@@ -25,7 +25,7 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
       {slot.itemType === "pallet" ? (
         <>
           <div className="space-y-1">
-            <label className="text-xs text-gray-400 font-mono block">PROJECT PROFILE ID (PALLET)</label>
+            <label className="text-xs text-gray-400 font-mono block">PROJECT NAME</label>
             <input
               type="text"
               placeholder="Enter ID to spawn pallet (Clear to empty)"
@@ -36,7 +36,7 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-gray-400 font-mono block">CONTENTS / BATCH INFO</label>
+            <label className="text-xs text-gray-400 font-mono block">CONTENTS / PALLET INFO</label>
             <textarea
               rows={3}
               placeholder="Specify server equipment chassis specifications..."
