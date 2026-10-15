@@ -18,10 +18,7 @@ export const FLOOR_ITEM_TYPES = [
   "walking-lane",
   "desk",
   "shelf",
-  "rack",
-  "island",
-  "workbench",
-  "other",
+  "other"
 ] as const;
 
 export type FloorItemType = (typeof FLOOR_ITEM_TYPES)[number];
@@ -31,10 +28,7 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
   "walking-lane": "Walking lane",
   desk: "Desk",
   shelf: "Shelf",
-  rack: "Pallet rack",
-  island: "Island",
-  workbench: "Workbench",
-  other: "Other landmark",
+  other: "Other"
 };
 
 export function isFloorItemType(value: unknown): value is FloorItemType {

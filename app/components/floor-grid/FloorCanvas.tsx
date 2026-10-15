@@ -271,12 +271,6 @@ export default function FloorCanvas({
             />
           )}
 
-          <div className="absolute left-[35%] top-0 bottom-0 border-r border-dashed border-gray-800/60 pointer-events-none flex items-center justify-center">
-            <span className="text-[10px] uppercase font-mono tracking-widest text-gray-700 select-none rotate-90">
-              Main Tech Walking Lane
-            </span>
-          </div>
-
           {slots.map((slot) => (
             <PalletSlot
               key={slot.id}
