@@ -88,6 +88,10 @@ export async function POST(request: Request) {
 
     const oldRow = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(targetId) as any;
 
+    if (body.action === "create" && oldRow) {
+      return NextResponse.json({ error: "Zone identifier active" }, { status: 409 });
+    }
+
     if (body.action !== "create" && oldRow && typeof body.version === "number") {
       if (oldRow.version !== body.version) {
         return NextResponse.json({ error: "Conflict: Outdated layout cache tracker state", currentVersion: oldRow.version }, { status: 409 });
@@ -142,14 +146,19 @@ export async function POST(request: Request) {
 
       try {
         db.transaction(() => {
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
-            .run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
-          db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "CREATED", NULL, ?, ?)')
-            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), systemTime);
+          db.prepare(`
+            INSERT INTO pallet_slots (
+              id, bay_id, item_type, is_occupied, project_id, notes,
+              x_pos, y_pos, version, width_cells, height_cells, updated_at
+            ) VALUES (?, ?, ?, 0, '', '', ?, ?, 1, ?, ?, ?)
+          `).run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
+          db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, NULL, ?, ?)')
+            .run(targetId, "CREATED", JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), systemTime);
         })();
         return NextResponse.json({ success: true });
       } catch (e) {
-        return NextResponse.json({ error: "Zone identifier active" }, { status: 409 });
+        console.error("Failed to create floor item", e);
+        return NextResponse.json({ error: "Unable to persist floor item" }, { status: 500 });
       }
     }
 
@@ -202,8 +211,8 @@ export async function DELETE(request: Request) {
       if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied" };
 
       db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(targetId);
-      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, "DELETED", ?, NULL, ?)')
-        .run(targetId, JSON.stringify(activeRecord), systemTime);
+      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, NULL, ?)')
+        .run(targetId, "DELETED", JSON.stringify(activeRecord), systemTime);
 
       return { status: 200 };
     })();

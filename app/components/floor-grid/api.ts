@@ -8,10 +8,37 @@ export async function fetchLayout(): Promise<PhysicalPallet[] | null> {
   return data.error ? null : data;
 }
 
-export async function postSlot(payload: object): Promise<void> {
-  await fetch(ENDPOINT, {
+export async function postSlot(payload: object): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+
+  const data = await res.json().catch(() => null) as { error?: unknown } | null;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: typeof data?.error === "string" ? data.error : `Save failed (${res.status})`,
+    };
+  }
+
+  return { ok: true };
+}
+
+export async function deleteSlot(itemId: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${ENDPOINT}?id=${encodeURIComponent(itemId)}`, {
+    method: "DELETE",
+    headers: { "X-Admin-PIN": "1234" },
+  });
+
+  const data = await res.json().catch(() => null) as { error?: unknown } | null;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: typeof data?.error === "string" ? data.error : `Delete failed (${res.status})`,
+    };
+  }
+
+  return { ok: true };
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { PhysicalPallet, type BayId, type FloorItemType, type GridFootprint } from "./types";
-import { fetchLayout, postSlot } from "./api";
+import { deleteSlot, fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, getPositionForFootprint, type CanvasSize } from "./layoutPositions";
 
 export function useFloorLayout() {
@@ -94,13 +94,38 @@ export function useFloorLayout() {
       notes: "",
       ...position,
     };
-    setSlots((prev) => [...prev, brandNew]);
-    setSelectedSlot(brandNew);
-    setPendingFootprint(null);
-    setIsPlacingItem(false);
+    try {
+      const result = await postSlot({ ...brandNew, action: "create" });
+      if (!result.ok) {
+        alert(`Unable to save item: ${result.error}`);
+        return false;
+      }
 
-    await postSlot({ ...brandNew, action: "create" });
-    return true;
+      setSlots((prev) => [...prev, brandNew]);
+      setSelectedSlot(brandNew);
+      setPendingFootprint(null);
+      setIsPlacingItem(false);
+      return true;
+    } catch (error) {
+      alert(`Unable to save item: ${error instanceof Error ? error.message : "Network error"}`);
+      return false;
+    }
+  };
+
+  const deleteZone = async (itemId: string) => {
+    try {
+      const result = await deleteSlot(itemId);
+      if (!result.ok) return result;
+
+      setSlots((prev) => prev.filter((slot) => slot.id !== itemId));
+      setSelectedSlot((prev) => prev?.id === itemId ? null : prev);
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
   };
 
   /** xPct / yPct are raw canvas percentages; placement snaps to the nearest open cell. */
@@ -181,6 +206,7 @@ export function useFloorLayout() {
     saveDetails,
     renameZone,
     createZone,
+    deleteZone,
     moveZone,
     movePallet,
   };

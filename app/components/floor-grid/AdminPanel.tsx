@@ -6,6 +6,7 @@ import {
   type GridFootprint,
   type PhysicalPallet,
 } from "./types";
+import DeleteItemButton from "./DeleteItemButton";
 
 interface Props {
   selectedSlot: PhysicalPallet | null;
@@ -16,11 +17,13 @@ interface Props {
   onCancelPlacement: () => void;
   onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint) => Promise<boolean>;
   onRename: (newName: string) => void;
+  onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export default function AdminPanel({
   selectedSlot, isPlacingItem, pendingFootprint, placementAvailable,
   onStartPlacement, onCancelPlacement, onCreate, onRename,
+  onDelete,
 }: Props) {
   const [newSlotId, setNewSlotId] = useState("");
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
@@ -111,7 +114,10 @@ export default function AdminPanel({
       {selectedSlot && (
         // key resets the rename field whenever a different zone is selected
         <div key={selectedSlot.id} className="pt-4 border-t border-gray-700 space-y-2">
-          <label className="text-xs text-gray-400 font-mono block">RENAME SELECTED ITEM</label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-xs text-gray-400 font-mono block">RENAME SELECTED ITEM</label>
+            <DeleteItemButton itemId={selectedSlot.id} onDelete={onDelete} />
+          </div>
           <div className="flex gap-2">
             <input
               type="text"

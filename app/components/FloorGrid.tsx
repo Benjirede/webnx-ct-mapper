@@ -50,12 +50,13 @@ export default function FloorGrid() {
               onStartPlacement={layout.startItemPlacement}
               onCancelPlacement={layout.cancelPalletPlacement}
               onRename={layout.renameZone}
+              onDelete={layout.deleteZone}
             />
           ) : (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-300">Staging Inspector</h2>
               {selectedSlot ? (
-                <InspectorPanel key={selectedSlot.id} slot={selectedSlot} onSave={layout.saveDetails} />
+                <InspectorPanel key={selectedSlot.id} slot={selectedSlot} onSave={layout.saveDetails} onDelete={layout.deleteZone} />
               ) : (
                 <p className="text-gray-500 text-sm italic">
                   Click any physical pallet box on the canvas layout to inspect, or drag an occupied pallet onto a vacant zone slot.

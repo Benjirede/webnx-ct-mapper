@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { FLOOR_ITEM_LABELS, type PhysicalPallet } from "./types";
+import DeleteItemButton from "./DeleteItemButton";
 
 interface Props {
   slot: PhysicalPallet;
   onSave: (projectId: string, notes: string) => void;
+  onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-export default function InspectorPanel({ slot, onSave }: Props) {
+export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
   const [projectId, setProjectId] = useState(slot.projectId);
   const [notes, setNotes] = useState(slot.notes);
 
   return (
     <div className="space-y-4">
-      <div>
-        <span className="text-xs text-gray-400 font-mono block">LOCATION SLOT</span>
-        <p className="text-xl font-bold text-emerald-400">{slot.id}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="text-xs text-gray-400 font-mono block">LOCATION SLOT</span>
+          <p className="text-xl font-bold text-emerald-400">{slot.id}</p>
+        </div>
+        <DeleteItemButton itemId={slot.id} onDelete={onDelete} />
       </div>
 
       {slot.itemType === "pallet" ? (
