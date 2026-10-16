@@ -46,4 +46,5 @@ export interface PhysicalPallet {
   notes: string;
   xPos: number;
   yPos: number;
+  version?: number;
 }

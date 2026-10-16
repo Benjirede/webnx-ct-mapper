@@ -49,7 +49,12 @@ export function useFloorLayout() {
     };
     setSlots((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     setSelectedSlot(updated);
-    await postSlot(updated);
+    const result = await postSlot(updated);
+    if (result.ok && result.version !== undefined) {
+      const saved = { ...updated, version: result.version };
+      setSlots((prev) => prev.map((slot) => (slot.id === updated.id ? saved : slot)));
+      setSelectedSlot((prev) => prev?.id === updated.id ? saved : prev);
+    }
   };
 
   const renameZone = async (newName: string) => {
@@ -142,7 +147,12 @@ export function useFloorLayout() {
     const updated = { ...target, ...position };
     setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
     if (selectedSlot?.id === sourceId) setSelectedSlot(updated);
-    await postSlot(updated);
+    const result = await postSlot(updated);
+    if (result.ok && result.version !== undefined) {
+      const saved = { ...updated, version: result.version };
+      setSlots((prev) => prev.map((slot) => (slot.id === sourceId ? saved : slot)));
+      setSelectedSlot((prev) => prev?.id === sourceId ? saved : prev);
+    }
   };
 
   const movePallet = async (sourceId: string, targetSlot: PhysicalPallet) => {

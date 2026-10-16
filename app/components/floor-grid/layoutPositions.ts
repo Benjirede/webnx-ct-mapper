@@ -4,6 +4,7 @@ import type { BayId } from "./types";
 //adjust gird size for each bay based on real-world dimensions and layout
 export const CELL_WIDTH = 70;
 export const CELL_HEIGHT = 60;
+const OVERLAP_EPSILON = 1e-9;
 
 export interface GridDimensions {
   columns: number;
@@ -60,8 +61,8 @@ export function getPositionForFootprint(
   const overlapsSlot = slots.some((slot) => {
     const slotCenterColumn = (slot.xPos / 100) * columns;
     const slotCenterRow = (slot.yPos / 100) * rows;
-    return Math.abs(centerColumn - slotCenterColumn) < (widthCells + slot.widthCells) / 2 &&
-      Math.abs(centerRow - slotCenterRow) < (heightCells + slot.heightCells) / 2;
+    return Math.abs(centerColumn - slotCenterColumn) < (widthCells + slot.widthCells) / 2 - OVERLAP_EPSILON &&
+      Math.abs(centerRow - slotCenterRow) < (heightCells + slot.heightCells) / 2 - OVERLAP_EPSILON;
   });
   if (overlapsSlot) return null;
 
@@ -99,8 +100,8 @@ export function findNearestOpenPosition(
 
         const slotX = (slot.xPos / 100) * grid.columns;
         const slotY = (slot.yPos / 100) * grid.rows;
-        return Math.abs(centerColumn - slotX) < (footprint.widthCells + slot.widthCells) / 2 &&
-          Math.abs(centerRow - slotY) < (footprint.heightCells + slot.heightCells) / 2;
+        return Math.abs(centerColumn - slotX) < (footprint.widthCells + slot.widthCells) / 2 - OVERLAP_EPSILON &&
+          Math.abs(centerRow - slotY) < (footprint.heightCells + slot.heightCells) / 2 - OVERLAP_EPSILON;
       });
 
       if (overlapsSlot) continue;

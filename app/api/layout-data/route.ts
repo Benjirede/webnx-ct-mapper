@@ -44,7 +44,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const systemTime = new Date().toISOString();
+    const systemTime = new Date().toISOString();1234
 
     // ------------------------------------------------------------------------
     // SUB-ROUTING INTENT A: ATOMIC SINGLE-TRANSACTION PALLET MOVEMENT
@@ -187,7 +187,7 @@ export async function POST(request: Request) {
         .run(targetId, computedAction, JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1 }), JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1 }), systemTime);
     })();
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, version: oldRow.version + 1 });
   } catch (error) {
     return NextResponse.json({ error: "Transactional critical interface error" }, { status: 500 });
   }
