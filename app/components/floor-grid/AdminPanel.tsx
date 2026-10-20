@@ -48,7 +48,7 @@ export default function AdminPanel({
       </header>
 
       <section aria-labelledby="add-item-title" className="space-y-4">
-        <div>DESK
+        <div>
           <p className="mt-1 text-xs text-gray-400">Enter an ID and type of floor item to add. Then select the space to take up on the floor.</p>
         </div>
 
