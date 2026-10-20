@@ -3,13 +3,23 @@ import path from 'path';
 
 let dbPath = process.env.DATABASE_URL;
 if (!dbPath) {
-  dbPath = path.resolve(process.cwd(), 'webnx_floor.db');
+  dbPath = path.resolve(__dirname, '..', '..', '..', 'webnx_floor.db');
 }
 
-const db = new Database(dbPath);
+// Open the database with a built-in timeout pool so it gracefully waits out local locks
+const db = new Database(dbPath, { timeout: 5000 });
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+try {
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+} catch (err: any) {
+  // If we are currently compiling inside a Docker sandbox and hit a locked asset, print warning and continue
+  if (err.code === 'SQLITE_BUSY') {
+    console.warn("⚠️ Database is busy/locked by host process. Proceeding with static compilation wrapper...");
+  } else {
+    throw err;
+  }
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS pallet_slots (

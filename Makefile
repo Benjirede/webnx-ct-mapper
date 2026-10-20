@@ -9,7 +9,7 @@ setup:
 run:
 	-docker stop ct-mapper-prod 2>/dev/null || true
 	-docker rm ct-mapper-prod 2>/dev/null || true
-	docker build -t webnx-ct-mapper .
+	docker build --pull -t webnx-ct-mapper .
 	docker run -d -p 3000:3000 -v $$(pwd)/data:/app/data --name ct-mapper-prod webnx-ct-mapper
 	@echo "🚀 Container is running! View the app at http://localhost:3000"
 
