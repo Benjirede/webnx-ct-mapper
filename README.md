@@ -1,88 +1,84 @@
-# WebNX Custom Tech (CT) Floor Asset & Project Mapper
+# 🐳 WebNX Custom Tech Floor Asset & Project Mapper
 
-An interactive, responsive digital twin dashboard built to solve physical inventory fragmentation and streamline workflow allocation inside the WebNX configuration lab.
+An interactive digital twin dashboard built to solve physical inventory fragmentation and streamline workflow allocation inside the WebNX configuration lab.
 
 ## 🚀 The Business Problem Solved
 
-Previously, hardware components assigned to large-scale, custom server builds were staged on warehouse pallets in the CT floor area with zero real-time visual tracking. This forced techs to manually search the floor to match physical pallets with incoming client project profiles, leading to time fragmentation.
+Previously, hardware components assigned to large-scale custom builds were staged on warehouse pallets in the CT floor area with zero real-time tracking. Technicians had to manually search the physical floor to match pallets with incoming project profiles.
 
-This internal utility creates a localized **digital map grid** of the physical floor space, mapping spatial coordinate locations to active hardware batches and matching them directly with active profiles in the primary company database.
+This utility creates a localized **digital map grid** of the physical floor space, mapping spatial coordinate locations to active hardware batches and matching them directly with active profiles in the primary company database.
 
-## 🛠️ Technical Stack
+---
 
-* **Framework:** Next.js 14 (App Router Architecture)
-* **Frontend UI:** React, TypeScript, Tailwind CSS (Interactive Grid Engine)
-* **Backend Data Layer:** Node.js API Routes with localized filesystem JSON stream caching for lightweight, zero-overhead execution behind strict datacenter firewalls.
+## 🛠️ Technical Stack & Architecture
 
-## ⚙️ Key Architectural Implementations
+* **Framework:** Next.js 15 (App Router Architecture)
+* **Frontend UI:** React 19, TypeScript, Tailwind CSS (Interactive Grid Engine)
+* **Database Layer:** SQLite (`better-sqlite3`) with explicit atomicity and multi-statement transaction wrappers.
+* **Concurrency Engine:** Optimistic locking via incremental database state version checks protecting record mutations from race conditions.
+* **Cross-Platform Standalone Container:** Multi-stage Docker build utilizing an offline dependency cache engine to bypass cross-compilation native binary timeouts during compilation layers.
 
-* **Decoupled URL Integration:** Securely maps operational anchors to external company tracking IDs (`https://webnx.com[id]`) via clean URL parsing, providing immediate business utility without touching or risking production database integrity.
-* **Responsive State Engine:** Utilizes React state to instantly track populated vs. empty spatial slots, flashing visual alerts (Tailwind dynamic styles) to prevent pallet allocation collisions.
-* **Enterprise Asset Ready:** Engineered explicitly using JavaScript/TypeScript to natively align with WebNX's existing web property infrastructure (`webnx.com` and `gorillaservers.com`).
+---
 
+## 📋 Onboarding Prerequisites
 
-# 🐳 WebNX Tech Floor Digital Twin Mapper (Production Deployment)
+Every developer or manager testing this application must have **Docker** installed and running on their local machine:
 
-This repository contains the production-optimized standalone container environment for mapping and tracking tech floor assets with built-in optimistic concurrency guards and atomic transaction handlers.
+### 🪟 Windows Users
+* Download and install **Docker Desktop**: [://docker.com](https://www.://docker.com). Ensure the Docker Desktop app is launched and active in your taskbar.
 
-## 🚀 Quick Start Guide (The Easiest Method)
+### 🍏 macOS Users
+* Download and install **Docker Desktop**: [://docker.com](https://www.://docker.com). Ensure the app is launched and active.
 
-If your system has `make` installed, you can spin up and fully test the isolated application image using single-word automation tasks:
-
+### 🐧 Ubuntu Linux Users
+Open your native terminal workspace and run the following command pipeline to install the engine and unlock permission restrictions:
 ```bash
-# 1. Initialize local dependencies & grant folder permissions
-make setup
+sudo apt update && sudo apt install -y docker.io make git
+sudo usermod -aG docker $USER
+```
+*⚠️ **Crucial Note:** You **must reboot your system** after executing the user group commands for the configuration permissions to bind correctly.*
 
-# 2. Compile and launch the production container stack
-make run
+---
 
-# 3. Run the 5-point automated integration test suite
-make test
+## 🚀 One-Command Quick Start Guide
+
+Clone the codebase and move into the project root directory before choosing your platform's single-step deployment shortcut below:
+```bash
+git clone <your-company-git-repo-url>/webnx-ct-mapper.git
+cd webnx-ct-mapper
 ```
 
-Once `make run` completes, open your web browser and navigate to:
+### 🍏 macOS & 🐧 Linux Users (Using Make)
+Open your terminal window and execute the automated setup pipeline:
+```bash
+make setup && make run
+```
+
+### 🪟 Windows Users (Using Native PowerShell)
+Open a standard Windows PowerShell prompt (or right-click the folder and select *Open in Terminal*) and execute the native execution script:
+```powershell
+.\run-stack.ps1
+```
+
+Once your script path finishes running, your deployment stack is fully live! Open your browser and navigate directly to:
 👉 **`http://localhost:3000`**
 
 ---
 
-## 🛠️ Manual Docker Deployment Commands
+## 🧪 Verifying Environment Integrity
 
-If you do not have `make` installed on your machine, execute this sequence sequentially to stand up the image environment manually:
+To fire the automated 5-point production integration suite (verifying layout states, 409 concurrency lock catches, and single-transaction atomic move handlers), choose your platform validation task:
 
-### 1. Configure Host Folder Permissions
-Ensure the container user has full read/write clearance to host file mappings for the database:
-```bash
-mkdir -p data && chmod 777 data
-```
-
-### 2. Compile the Production Image
-Build the container using the offline dependency configuration:
-```bash
-docker build -t webnx-ct-mapper .
-```
-
-### 3. Spin up the Container Stack
-Launch the container in detached mode, map port `3000`, and link the local database storage volume:
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -v $(pwd)/data:/app/data \
-  --name ct-mapper-prod \
-  webnx-ct-mapper
-```
-
-### 4. Verify Local Execution Stability
-Fire the integrated endpoint suite to ensure layout validations, 409 conflict catches, and atomic movement routines pass cleanly:
-```bash
-chmod +x test-image.sh
-./test-image.sh
-```
+* **macOS / Linux:** Run `make test`
+* **Windows:** Run `./test-image.sh` within Git Bash or your terminal prompt.
 
 ---
 
 ## 🧹 Tearing Down the Stack
-To clear the container out of active memory and release port `3000`, run:
-```bash
-docker stop ct-mapper-prod && docker rm ct-mapper-prod
-```
-*(Your map layout data and audit histories will remain perfectly safe inside your local `./data` folder).*
+
+To purge the active application container from your system's host memory and immediately release the port `3000` network bind, execute your cleanup hook:
+
+* **macOS / Linux:** Run `make stop`
+* **Windows:** Run `docker stop ct-mapper-prod && docker rm ct-mapper-prod`
+
+*(Your active map layout states, metadata profiles, and audit ledger timelines will remain completely safe inside your local `./data` directory folder for future runs).*
