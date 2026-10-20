@@ -18,6 +18,9 @@ export const FLOOR_ITEM_TYPES = [
   "walking-lane",
   "desk",
   "shelf",
+  "rack",
+  "island",
+  "workbench",
   "other"
 ] as const;
 
@@ -28,6 +31,9 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
   "walking-lane": "Walking lane",
   desk: "Desk",
   shelf: "Shelf",
+  rack: "Rack",
+  island: "Island",
+  workbench: "Workbench",
   other: "Other"
 };
 

@@ -7,6 +7,9 @@ const itemTypeStyles: Record<FloorItemType, string> = {
   "walking-lane": styles.walkingLane,
   desk: styles.desk,
   shelf: styles.shelf,
+  rack: styles.rack,
+  island: styles.island,
+  workbench: styles.workbench,
   other: styles.other,
 };
 
