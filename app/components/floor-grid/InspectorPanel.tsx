@@ -56,7 +56,7 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
           placeholder={
             isPallet
               ? "Specify server equipment chassis specifications..."
-              : `Add notes about this ${typeLabel.toLowerCase()}...`
+              : `Add notes here`
           }
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
