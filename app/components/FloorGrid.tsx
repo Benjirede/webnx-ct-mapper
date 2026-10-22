@@ -36,6 +36,10 @@ export default function FloorGrid() {
             placementAvailable={layout.placementAvailable}
             onFootprintChange={layout.setPendingFootprint}
             onFinishPlacement={layout.finishItemPlacement}
+            shelfContents={layout.shelfContents}
+            expandedShelfId={layout.expandedShelfId}
+            onCloseShelf={layout.closeShelf}
+            onShelfDrop={layout.moveToShelf}
         />
 
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl h-fit flex flex-col space-y-4">
@@ -43,6 +47,7 @@ export default function FloorGrid() {
             <AdminPanel
               key={selectedSlot?.id ?? "none"}
               selectedSlot={selectedSlot}
+              selectedStoredCount={selectedSlot ? layout.storedCountFor(selectedSlot.id) : 0}
               onCreate={layout.createZone}
               isPlacingItem={layout.isPlacingItem}
               pendingFootprint={layout.pendingFootprint}
@@ -56,7 +61,7 @@ export default function FloorGrid() {
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-300">Staging Inspector</h2>
               {selectedSlot ? (
-                <InspectorPanel key={selectedSlot.id} slot={selectedSlot} onSave={layout.saveDetails} onDelete={layout.deleteZone} />
+                <InspectorPanel key={selectedSlot.id} slot={selectedSlot} storedCount={layout.storedCountFor(selectedSlot.id)} onSave={layout.saveDetails} onDelete={layout.deleteZone} />
               ) : (
                 <p className="text-gray-500 text-sm italic">
                   Click any physical pallet box on the canvas layout to inspect, or drag an occupied pallet onto a vacant zone slot.

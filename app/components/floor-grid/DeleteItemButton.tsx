@@ -2,10 +2,12 @@ import { useState } from "react";
 
 interface Props {
   itemId: string;
+  /** When set, the delete button is disabled and this text explains why. */
+  disabledReason?: string;
   onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-export default function DeleteItemButton({ itemId, onDelete }: Props) {
+export default function DeleteItemButton({ itemId, onDelete, disabledReason }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -40,9 +42,10 @@ export default function DeleteItemButton({ itemId, onDelete }: Props) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
+        disabled={Boolean(disabledReason)}
         aria-label={`Delete ${itemId}`}
-        title="Delete item"
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded border border-rose-800 text-rose-300 transition-colors hover:border-rose-500 hover:bg-rose-950/60 hover:text-rose-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-400"
+        title={disabledReason ?? "Delete item"}
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded border border-rose-800 text-rose-300 transition-colors hover:border-rose-500 hover:bg-rose-950/60 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rose-800 disabled:hover:bg-transparent disabled:hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-400"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3" />

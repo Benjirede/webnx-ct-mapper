@@ -2,6 +2,10 @@ import { useState } from "react";
 import {
   FLOOR_ITEM_LABELS,
   FLOOR_ITEM_TYPES,
+  DEFAULT_LEVEL,
+  LEVEL_OPTIONS,
+  hasLevels,
+  getDeleteBlockedReason,
   type FloorItemType,
   type GridFootprint,
   type PhysicalPallet,
@@ -10,33 +14,40 @@ import DeleteItemButton from "./DeleteItemButton";
 
 interface Props {
   selectedSlot: PhysicalPallet | null;
+  selectedStoredCount: number;
   isPlacingItem: boolean;
   pendingFootprint: GridFootprint | null;
   placementAvailable: boolean;
   onStartPlacement: () => void;
   onCancelPlacement: () => void;
-  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint) => Promise<boolean>;
+  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint, levels?: number,) => Promise<boolean>;
   onRename: (newName: string) => void;
   onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export default function AdminPanel({
-  selectedSlot, isPlacingItem, pendingFootprint, placementAvailable,
+  selectedSlot, selectedStoredCount, isPlacingItem, pendingFootprint, placementAvailable,
   onStartPlacement, onCancelPlacement, onCreate, onRename,
   onDelete,
 }: Props) {
   const [newSlotId, setNewSlotId] = useState("");
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
+  const [levels, setLevels] = useState<number>(DEFAULT_LEVEL);
   const [renameValue, setRenameValue] = useState(selectedSlot?.id ?? "");
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const itemHasLevels = hasLevels(itemType);
+  const deleteBlockedReason = selectedSlot ? getDeleteBlockedReason(selectedSlot, selectedStoredCount) : undefined;
+
+  const handleCreate = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!pendingFootprint || !placementAvailable) return;
-    const confirmation = `Create ${newSlotId.trim()} as ${FLOOR_ITEM_LABELS[itemType]} (${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} cells) in this bay?`;
+    const levelsText = itemHasLevels ? `, ${levels} ${levels === 1 ? "level" : "levels"}` : "";
+    const confirmation = `Create ${newSlotId.trim()} as ${FLOOR_ITEM_LABELS[itemType]} (${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} cells${levelsText}) in this bay?`;
     if (!window.confirm(confirmation)) return;
-    if (await onCreate(newSlotId, itemType, pendingFootprint)) {
+    if (await onCreate(newSlotId, itemType, pendingFootprint, itemHasLevels ? levels : undefined)) {
       setNewSlotId("");
       setItemType("pallet");
+      setLevels(DEFAULT_LEVEL);
     }
   };
 
@@ -79,6 +90,23 @@ export default function AdminPanel({
             </select>
           </div>
 
+          {itemHasLevels && (
+            <div className="space-y-1.5">
+              <label htmlFor="shelf-levels" className="block text-xs font-medium text-gray-300">Shelf levels</label>
+              <select
+                id="shelf-levels"
+                value={levels}
+                onChange={(e) => setLevels(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-gray-100 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+              >
+                {LEVEL_OPTIONS.map((level) => (
+                  <option key={level} value={level}>{level} {level === 1 ? "level" : "levels"}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400">How many levels this shelf has. Pallets can be placed on each level.</p>
+            </div>
+          )}
+
           {isPlacingItem ? (
             <div className="flex items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
@@ -115,6 +143,7 @@ export default function AdminPanel({
               </p>
               <p className="mt-0.5 text-xs text-gray-300">
                 {FLOOR_ITEM_LABELS[itemType]} · {pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
+                {itemHasLevels && ` · ${levels} ${levels === 1 ? "level" : "levels"}`}
                 {!placementAvailable && " · Overlaps an item or is out of bounds"}
               </p>
             </div>
@@ -140,8 +169,13 @@ export default function AdminPanel({
               <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Selected item</p>
               <h3 id="selected-item-title" className="mt-0.5 truncate text-sm font-semibold text-gray-100">{selectedSlot.id}</h3>
             </div>
-            <DeleteItemButton itemId={selectedSlot.id} onDelete={onDelete} />
+            <DeleteItemButton itemId={selectedSlot.id} onDelete={onDelete} disabledReason={deleteBlockedReason} />
           </div>
+          {deleteBlockedReason && (
+            <p role="note" className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">
+              {deleteBlockedReason}
+            </p>
+          )}
           <div className="flex gap-2">
             <label htmlFor="rename-item-id" className="sr-only">New item ID</label>
             <input
@@ -158,6 +192,8 @@ export default function AdminPanel({
             >
               Rename
             </button>
+            
+            
           </div>
         </section>
       )}

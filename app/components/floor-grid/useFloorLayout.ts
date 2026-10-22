@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
-import { PhysicalPallet, type BayId, type FloorItemType, type GridFootprint } from "./types";
+import {
+  DEFAULT_LEVEL,
+  getDeleteBlockedReason,
+  getLevelCount,
+  hasLevels,
+  type PhysicalPallet,
+  type BayId,
+  type FloorItemType,
+  type GridFootprint,
+} from "./types";
 import { deleteSlot, fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, getPositionForFootprint, type CanvasSize } from "./layoutPositions";
 
@@ -13,16 +22,38 @@ export function useFloorLayout() {
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
   const [isPlacingItem, setIsPlacingItem] = useState(false);
   const [pendingFootprint, setPendingFootprint] = useState<GridFootprint | null>(null);
-  const activeSlots = slots.filter((slot) => slot.bayId === activeBay);
+  const [expandedShelfId, setExpandedShelfId] = useState<string | null>(null);
+
+  const bayItems = slots.filter((slot) => slot.bayId === activeBay);
+  // Things drawn on the floor (pallet slots, shelves, desks...). Pallets stored on a shelf are excluded.
+  const activeSlots = bayItems.filter((slot) => !slot.parentId);
+  // Pallets stored on shelves in the active bay.
+  const shelfContents = bayItems.filter((slot) => slot.parentId);
   const placementAvailable = pendingFootprint
     ? Boolean(getPositionForFootprint(activeSlots, activeBay, pendingFootprint))
     : false;
+
+  const countStored = (shelfId: string) =>
+    slots.reduce((total, slot) => (slot.parentId === shelfId ? total + 1 : total), 0);
+
+  const nextStoredId = (shelfId: string) => {
+    let n = 1;
+    while (slots.some((slot) => slot.id === `${shelfId}-P${n}`)) n += 1;
+    return `${shelfId}-P${n}`;
+  };
+
+  const applySavedVersion = (id: string, version?: number) => {
+    if (version === undefined) return;
+    setSlots((prev) => prev.map((slot) => (slot.id === id ? { ...slot, version } : slot)));
+    setSelectedSlot((prev) => (prev?.id === id ? { ...prev, version } : prev));
+  };
 
   const selectBay = (bay: BayId) => {
     setActiveBay(bay);
     setSelectedSlot(null);
     setPendingFootprint(null);
     setIsPlacingItem(false);
+    setExpandedShelfId(null);
   };
 
   useEffect(() => {
@@ -37,10 +68,50 @@ export function useFloorLayout() {
     setSelectedSlot(null);
     setPendingFootprint(null);
     setIsPlacingItem(false);
+    setExpandedShelfId(null);
+  };
+
+  /** Selecting a shelf/rack also opens (or closes) its contents view. */
+  const selectSlot = (slot: PhysicalPallet) => {
+    setSelectedSlot(slot);
+    if (hasLevels(slot.itemType)) {
+      setExpandedShelfId((prev) => (prev === slot.id ? null : slot.id));
+    }
+  };
+
+  const closeShelf = () => setExpandedShelfId(null);
+
+  const deleteZone = async (itemId: string): Promise<{ ok: boolean; error?: string }> => {
+    const target = slots.find((slot) => slot.id === itemId);
+    const blockedReason = target ? getDeleteBlockedReason(target, countStored(itemId)) : undefined;
+    if (blockedReason) return { ok: false, error: blockedReason };
+
+    try {
+      const result = await deleteSlot(itemId);
+      if (!result.ok) return result;
+
+      setSlots((prev) => prev.filter((slot) => slot.id !== itemId));
+      setSelectedSlot((prev) => (prev?.id === itemId ? null : prev));
+      setExpandedShelfId((prev) => (prev === itemId ? null : prev));
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
   };
 
   const saveDetails = async (projectId: string, notes: string) => {
     if (!selectedSlot) return;
+
+    // Clearing the project on a shelved pallet takes it off the shelf (it has no floor slot to go back to).
+    if (selectedSlot.parentId && projectId.trim() === "") {
+      const removed = await deleteZone(selectedSlot.id);
+      if (!removed.ok) alert(`Unable to remove pallet from shelf: ${removed.error}`);
+      return;
+    }
+
     const updated = {
       ...selectedSlot,
       isOccupied: projectId.trim() !== "",
@@ -60,20 +131,37 @@ export function useFloorLayout() {
   const renameZone = async (newName: string) => {
     if (!selectedSlot || !newName.trim()) return;
     const targetNewName = newName.trim().toUpperCase();
+    const oldId = selectedSlot.id;
 
-    if (slots.some((s) => s.id === targetNewName && s.id !== selectedSlot.id)) {
+    if (slots.some((s) => s.id === targetNewName && s.id !== oldId)) {
       alert("Collision: Another warehouse spot already uses that name!");
       return;
     }
 
     const renamed = { ...selectedSlot, id: targetNewName };
-    setSlots((prev) => prev.map((s) => (s.id === selectedSlot.id ? renamed : s)));
-    setSelectedSlot(renamed);
+    const children = hasLevels(selectedSlot.itemType) ? slots.filter((s) => s.parentId === oldId) : [];
 
-    await postSlot({ ...renamed, action: "rename", oldId: selectedSlot.id });
+    setSlots((prev) =>
+      prev.map((s) => {
+        if (s.id === oldId) return renamed;
+        if (s.parentId === oldId) return { ...s, parentId: targetNewName };
+        return s;
+      })
+    );
+    setSelectedSlot(renamed);
+    setExpandedShelfId((prev) => (prev === oldId ? targetNewName : prev));
+
+    await postSlot({ ...renamed, action: "rename", oldId });
+    // Keep stored pallets pointing at the renamed shelf.
+    await Promise.all(children.map((child) => postSlot({ ...child, parentId: targetNewName })));
   };
 
-  const createZone = async (newId: string, itemType: FloorItemType, footprint: GridFootprint) => {
+  const createZone = async (
+    newId: string,
+    itemType: FloorItemType,
+    footprint: GridFootprint,
+    levels?: number
+  ) => {
     if (!newId.trim()) return false;
     const finalId = newId.trim().toUpperCase();
 
@@ -97,6 +185,7 @@ export function useFloorLayout() {
       isOccupied: false,
       projectId: "",
       notes: "",
+      ...(hasLevels(itemType) ? { levels: levels ?? DEFAULT_LEVEL } : {}),
       ...position,
     };
     try {
@@ -117,26 +206,10 @@ export function useFloorLayout() {
     }
   };
 
-  const deleteZone = async (itemId: string) => {
-    try {
-      const result = await deleteSlot(itemId);
-      if (!result.ok) return result;
-
-      setSlots((prev) => prev.filter((slot) => slot.id !== itemId));
-      setSelectedSlot((prev) => prev?.id === itemId ? null : prev);
-      return result;
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : "Network error",
-      };
-    }
-  };
-
   /** xPct / yPct are raw canvas percentages; placement snaps to the nearest open cell. */
   const moveZone = async (sourceId: string, xPct: number, yPct: number) => {
     const target = slots.find((s) => s.id === sourceId);
-    if (!target || target.bayId !== activeBay) return;
+    if (!target || target.bayId !== activeBay || target.parentId) return;
 
     const position = findNearestOpenPosition(activeSlots, canvasSize, activeBay, xPct, yPct, sourceId, target);
     if (!position) {
@@ -155,9 +228,10 @@ export function useFloorLayout() {
     }
   };
 
+  /** Drop an occupied pallet (from the floor or a shelf) onto a vacant floor pallet slot. */
   const movePallet = async (sourceId: string, targetSlot: PhysicalPallet) => {
     if (sourceId === targetSlot.id) return;
-    if (targetSlot.itemType !== "pallet") return;
+    if (targetSlot.itemType !== "pallet" || targetSlot.parentId) return;
     if (targetSlot.isOccupied) {
       alert("Allocation Collision: This location slot already has an active inventory pallet block!");
       return;
@@ -175,6 +249,29 @@ export function useFloorLayout() {
       projectId: sourceSlot.projectId,
       notes: sourceSlot.notes,
     };
+
+    // Taking a pallet off a shelf: its contents move to the floor slot and the shelf record is removed.
+    if (sourceSlot.parentId) {
+      const saved = await postSlot(newTarget);
+      if (!saved.ok) {
+        alert(`Unable to move pallet: ${saved.error}`);
+        return;
+      }
+      const removed = await deleteSlot(sourceSlot.id);
+      if (!removed.ok) {
+        await postSlot(targetSlot); // roll back so the pallet isn't on both
+        alert(`Unable to remove pallet from shelf: ${removed.error}`);
+        return;
+      }
+
+      setSlots((prev) =>
+        prev.filter((s) => s.id !== sourceSlot.id).map((s) => (s.id === targetSlot.id ? newTarget : s))
+      );
+      setSelectedSlot((prev) => (prev?.id === sourceSlot.id || prev?.id === targetSlot.id ? newTarget : prev));
+      applySavedVersion(targetSlot.id, saved.version);
+      return;
+    }
+
     const newSource = { ...sourceSlot, isOccupied: false, projectId: "", notes: "" };
 
     setSlots((prev) =>
@@ -187,6 +284,92 @@ export function useFloorLayout() {
     await postSlot(newSource);
   };
 
+  /** Drop an occupied pallet (from the floor or another shelf slot) into a shelf cell. */
+  const moveToShelf = async (sourceId: string, shelfId: string, level: number, column: number, row: number) => {
+    const shelf = slots.find((s) => s.id === shelfId);
+    const source = slots.find((s) => s.id === sourceId);
+    const reject = (reason: string) => {
+      console.warn("moveToShelf rejected:", reason, { sourceId, shelfId, level, column, row, shelf, source });
+      alert(`Can't store that pallet: ${reason}`);
+    };
+    if (!shelf) return reject(`shelf "${shelfId}" was not found.`);
+    if (!source) return reject(`dragged item "${sourceId}" was not found.`);
+    if (!hasLevels(shelf.itemType)) return reject(`${shelfId} is not a shelf or rack.`);
+    if (source.itemType !== "pallet") return reject("only pallets can be stored on a shelf.");
+    if (!source.isOccupied) return reject("that pallet slot is empty.");
+    if (shelf.bayId !== activeBay || source.bayId !== activeBay) return reject("the pallet and shelf must be in the same bay.");
+    if (
+      level < 1 || level > getLevelCount(shelf) ||
+      column < 0 || column >= shelf.widthCells ||
+      row < 0 || row >= shelf.heightCells
+    ) return reject(`level ${level}, column ${column + 1}, row ${row + 1} is outside the shelf (levels: ${getLevelCount(shelf)}).`);
+
+    if (source.parentId === shelfId && source.level === level && source.cellColumn === column && source.cellRow === row) return;
+
+    const taken = slots.some(
+      (s) => s.parentId === shelfId && s.level === level && s.cellColumn === column && s.cellRow === row
+    );
+    if (taken) {
+      alert("That shelf slot already holds a pallet.");
+      return;
+    }
+
+    // Already on a shelf: just change its cell (and shelf, if different).
+    if (source.parentId) {
+      const updated = { ...source, parentId: shelfId, level, cellColumn: column, cellRow: row };
+      setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
+      setSelectedSlot((prev) => (prev?.id === sourceId ? updated : prev));
+      const result = await postSlot(updated);
+      if (!result.ok) {
+        setSlots((prev) => prev.map((s) => (s.id === sourceId ? source : s)));
+        setSelectedSlot((prev) => (prev?.id === sourceId ? source : prev));
+        alert(`Unable to move pallet: ${result.error}`);
+        return;
+      }
+      applySavedVersion(sourceId, result.version);
+      return;
+    }
+
+    // From the floor: the pallet's contents go onto a new shelf record and the floor slot is emptied.
+    const stored: PhysicalPallet = {
+      id: nextStoredId(shelfId),
+      bayId: shelf.bayId,
+      itemType: "pallet",
+      widthCells: 1,
+      heightCells: 1,
+      isOccupied: true,
+      projectId: source.projectId,
+      notes: source.notes,
+      xPos: 0,
+      yPos: 0,
+      parentId: shelfId,
+      level,
+      cellColumn: column,
+      cellRow: row,
+    };
+    const emptied = { ...source, isOccupied: false, projectId: "", notes: "" };
+
+    try {
+      const created = await postSlot({ ...stored, action: "create" });
+      if (!created.ok) {
+        alert(`Unable to store pallet: ${created.error}`);
+        return;
+      }
+      const cleared = await postSlot(emptied);
+      if (!cleared.ok) {
+        await deleteSlot(stored.id); // roll back so the pallet isn't in two places
+        alert(`Unable to store pallet: ${cleared.error}`);
+        return;
+      }
+
+      setSlots((prev) => [...prev.map((s) => (s.id === source.id ? emptied : s)), stored]);
+      setSelectedSlot((prev) => (prev?.id === source.id ? stored : prev));
+      applySavedVersion(source.id, cleared.version);
+    } catch (error) {
+      alert(`Unable to store pallet: ${error instanceof Error ? error.message : "Network error"}`);
+    }
+  };
+
   return {
     slots,
     selectedSlot,
@@ -194,6 +377,8 @@ export function useFloorLayout() {
     isAdminMode,
     activeBay,
     activeSlots,
+    shelfContents,
+    expandedShelfId,
     searchQuery,
     isPlacingItem,
     pendingFootprint,
@@ -210,7 +395,8 @@ export function useFloorLayout() {
       setIsPlacingItem(false);
     },
     finishItemPlacement: () => setIsPlacingItem(false),
-    selectSlot: setSelectedSlot,
+    selectSlot,
+    closeShelf,
     selectBay,
     toggleAdminMode,
     saveDetails,
@@ -219,5 +405,7 @@ export function useFloorLayout() {
     deleteZone,
     moveZone,
     movePallet,
+    moveToShelf,
+    storedCountFor: countStored,
   };
 }

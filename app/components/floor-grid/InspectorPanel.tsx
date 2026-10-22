@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { FLOOR_ITEM_LABELS, type PhysicalPallet } from "./types";
+import { FLOOR_ITEM_LABELS, getDeleteBlockedReason, getLevelCount, type PhysicalPallet } from "./types";
 import DeleteItemButton from "./DeleteItemButton";
 
 interface Props {
   slot: PhysicalPallet;
+  storedCount: number;
   onSave: (projectId: string, notes: string) => void;
   onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
+export default function InspectorPanel({ slot, storedCount, onSave, onDelete }: Props) {
   const [projectId, setProjectId] = useState(slot.projectId);
   const [notes, setNotes] = useState(slot.notes ?? "");
   const isPallet = slot.itemType === "pallet";
   const typeLabel = FLOOR_ITEM_LABELS[slot.itemType];
+  const levelCount = getLevelCount(slot);
+  const deleteBlockedReason = getDeleteBlockedReason(slot, storedCount);
 
   return (
     <div className="space-y-4">
@@ -21,12 +24,17 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
           <span className="text-xs text-gray-400 font-mono block">{typeLabel} ID</span>
           <p className="text-xl font-bold text-emerald-400">{slot.id}</p>
         </div>
-        <DeleteItemButton itemId={slot.id} onDelete={onDelete} />
+        <DeleteItemButton itemId={slot.id} onDelete={onDelete} disabledReason={deleteBlockedReason} />
       </div>
 
       {isPallet ? (
         <div className="space-y-1">
           <label htmlFor="inspector-project" className="text-xs text-gray-400 font-mono block">PROJECT NAME</label>
+          {slot.parentId && (
+            <p className="text-xs text-gray-400">
+              Stored on {slot.parentId}, level {slot.level ?? 1}. Clear the name and save to remove it from the shelf.
+            </p>
+          )}
           <input
             id="inspector-project"
             type="text"
@@ -43,6 +51,19 @@ export default function InspectorPanel({ slot, onSave, onDelete }: Props) {
             Footprint: {slot.widthCells} x {slot.heightCells} cells
           </p>
           <p className="mt-1 text-xs text-gray-400">Bay {slot.bayId.slice(-1)}</p>
+          {levelCount > 0 && (
+            <>
+              <p className="mt-1 text-xs text-gray-400">
+                {levelCount} {levelCount === 1 ? "level" : "levels"}, {storedCount} of {slot.widthCells * slot.heightCells * levelCount} pallet slots used
+              </p>
+              <p className="mt-2 text-xs text-gray-400">Click the {typeLabel.toLowerCase()} on the floor map to open it, then drag pallets in or out.</p>
+              {deleteBlockedReason && (
+                <p role="note" className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">
+                  {deleteBlockedReason}
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
