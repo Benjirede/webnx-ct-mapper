@@ -4,7 +4,6 @@ import { FLOOR_ITEM_LABELS, getLevelCount, type PhysicalPallet } from "./types";
 
 const PANEL_MIN_WIDTH = 248;
 const PANEL_PADDING = 12;
-// Rough height of the header, level tabs and footer. Only used to keep the panel on the canvas.
 const CHROME_HEIGHT = 176;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -23,10 +22,6 @@ interface Props {
   onDropPallet: (sourceId: string, level: number, column: number, row: number) => void;
 }
 
-/**
- * The opened-up inside of a shelf or rack. Each cell is the same size as a floor cell, so a stored
- * pallet looks and drags exactly like a pallet on the floor. One level is shown at a time.
- */
 export default function ShelfView({
   shelf, contents, selectedId, query, scale, canvasWidth, canvasHeight,
   onClose, onSelect, onDropPallet,
@@ -36,6 +31,21 @@ export default function ShelfView({
   const [hoverCell, setHoverCell] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const activeLevel = Math.min(level, levelCount);
+
+  // Dragging state
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number }>({
+    startX: 0,
+    startY: 0,
+    initialX: 0,
+    initialY: 0,
+  });
+
+  // Reset custom drag position whenever a different shelf is opened
+  useEffect(() => {
+    setPosition(null);
+  }, [shelf.id]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -53,10 +63,64 @@ export default function ShelfView({
   const gridHeight = shelf.heightCells * CELL_HEIGHT;
   const panelWidth = Math.max(PANEL_MIN_WIDTH, gridWidth + PANEL_PADDING * 2);
   const panelHeight = gridHeight + CHROME_HEIGHT;
+
+  // Default centered position calculation
   const centerX = (shelf.xPos / 100) * canvasWidth;
   const centerY = (shelf.yPos / 100) * canvasHeight;
-  const left = clamp(centerX - (panelWidth * scale) / 2, 0, Math.max(0, canvasWidth - panelWidth * scale));
-  const top = clamp(centerY - (panelHeight * scale) / 2, 0, Math.max(0, canvasHeight - panelHeight * scale));
+  const defaultLeft = clamp(centerX - (panelWidth * scale) / 2, 0, Math.max(0, canvasWidth - panelWidth * scale));
+  const defaultTop = clamp(centerY - (panelHeight * scale) / 2, 0, Math.max(0, canvasHeight - panelHeight * scale));
+
+  const currentPos = position ?? { x: defaultLeft, y: defaultTop };
+
+  // Mouse drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Prevent dragging if clicking buttons inside the header
+    if ((e.target as HTMLElement).closest("button")) return;
+
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: currentPos.x,
+      initialY: currentPos.y,
+    };
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Account for canvas scale so dragging speed matches the zoom level
+      const dx = (e.clientX - dragRef.current.startX) / scale;
+      const dy = (e.clientY - dragRef.current.startY) / scale;
+
+      const newX = clamp(
+        dragRef.current.initialX + dx,
+        0,
+        Math.max(0, canvasWidth - panelWidth * scale)
+      );
+      const newY = clamp(
+        dragRef.current.initialY + dy,
+        0,
+        Math.max(0, canvasHeight - panelHeight * scale)
+      );
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, scale, canvasWidth, canvasHeight, panelWidth, panelHeight]);
 
   const capacity = shelf.widthCells * shelf.heightCells * levelCount;
   const levelContents = contents.filter((pallet) => pallet.level === activeLevel);
@@ -77,15 +141,19 @@ export default function ShelfView({
       aria-label={`${shelf.id} contents`}
       className="absolute z-50 cursor-default rounded-lg border border-emerald-500/60 bg-gray-900/95 p-3 shadow-2xl backdrop-blur-sm"
       style={{
-        left,
-        top,
+        left: currentPos.x,
+        top: currentPos.y,
         width: panelWidth,
         transform: scale === 1 ? undefined : `scale(${scale})`,
         transformOrigin: "top left",
       }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+      {/* Drag Handle Header */}
+      <div
+        className="flex items-start justify-between gap-2 cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={handleMouseDown}
+      >
+        <div className="min-w-0 pointer-events-none">
           <p className="text-[11px] text-gray-400">{FLOOR_ITEM_LABELS[shelf.itemType]}</p>
           <p className="truncate text-sm font-bold text-emerald-300">{shelf.id}</p>
           <p className="text-[11px] text-gray-400">{contents.length} of {capacity} slots used</p>
