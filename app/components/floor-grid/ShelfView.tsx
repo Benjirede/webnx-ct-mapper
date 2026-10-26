@@ -65,7 +65,7 @@ export default function ShelfView({
   const hint =
     contents.length === 0
       ? "Drag an occupied pallet from the floor into an open slot."
-      : "Drag pallets between slots, or onto an empty floor pallet to take them out.";
+      : "Drag pallets between slots, or drop them on open floor to take them out.";
 
   return (
     <div

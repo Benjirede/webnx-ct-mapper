@@ -36,12 +36,6 @@ export function useFloorLayout() {
   const countStored = (shelfId: string) =>
     slots.reduce((total, slot) => (slot.parentId === shelfId ? total + 1 : total), 0);
 
-  const nextStoredId = (shelfId: string) => {
-    let n = 1;
-    while (slots.some((slot) => slot.id === `${shelfId}-P${n}`)) n += 1;
-    return `${shelfId}-P${n}`;
-  };
-
   const applySavedVersion = (id: string, version?: number) => {
     if (version === undefined) return;
     setSlots((prev) => prev.map((slot) => (slot.id === id ? { ...slot, version } : slot)));
@@ -107,6 +101,11 @@ export function useFloorLayout() {
 
     // Clearing the project on a shelved pallet takes it off the shelf (it has no floor slot to go back to).
     if (selectedSlot.parentId && projectId.trim() === "") {
+      const emptied = await postSlot({ ...selectedSlot, isOccupied: false, projectId: "", notes });
+      if (!emptied.ok) {
+        alert(`Unable to remove pallet from shelf: ${emptied.error}`);
+        return;
+      }
       const removed = await deleteZone(selectedSlot.id);
       if (!removed.ok) alert(`Unable to remove pallet from shelf: ${removed.error}`);
       return;
@@ -139,7 +138,6 @@ export function useFloorLayout() {
     }
 
     const renamed = { ...selectedSlot, id: targetNewName };
-    const children = hasLevels(selectedSlot.itemType) ? slots.filter((s) => s.parentId === oldId) : [];
 
     setSlots((prev) =>
       prev.map((s) => {
@@ -152,8 +150,6 @@ export function useFloorLayout() {
     setExpandedShelfId((prev) => (prev === oldId ? targetNewName : prev));
 
     await postSlot({ ...renamed, action: "rename", oldId });
-    // Keep stored pallets pointing at the renamed shelf.
-    await Promise.all(children.map((child) => postSlot({ ...child, parentId: targetNewName })));
   };
 
   const createZone = async (
@@ -250,16 +246,18 @@ export function useFloorLayout() {
       notes: sourceSlot.notes,
     };
 
-    // Taking a pallet off a shelf: its contents move to the floor slot and the shelf record is removed.
+    // Shelf -> vacant floor slot: the contents move to the floor slot and the shelf record is removed.
     if (sourceSlot.parentId) {
       const saved = await postSlot(newTarget);
       if (!saved.ok) {
         alert(`Unable to move pallet: ${saved.error}`);
         return;
       }
-      const removed = await deleteSlot(sourceSlot.id);
+      // The API only deletes empty records, so empty the shelf record before removing it.
+      const cleared = await postSlot({ ...sourceSlot, isOccupied: false, projectId: "", notes: "" });
+      const removed = cleared.ok ? await deleteSlot(sourceSlot.id) : cleared;
       if (!removed.ok) {
-        await postSlot(targetSlot); // roll back so the pallet isn't on both
+        await postSlot({ ...targetSlot, version: saved.version ?? targetSlot.version, isOccupied: false, projectId: "", notes: "" });
         alert(`Unable to remove pallet from shelf: ${removed.error}`);
         return;
       }
@@ -280,11 +278,16 @@ export function useFloorLayout() {
     if (selectedSlot?.id === sourceSlot.id) setSelectedSlot(newSource);
     if (selectedSlot?.id === targetSlot.id) setSelectedSlot(newTarget);
 
-    await postSlot(newTarget);
-    await postSlot(newSource);
+    const targetResult = await postSlot(newTarget);
+    const sourceResult = await postSlot(newSource);
+    applySavedVersion(targetSlot.id, targetResult.version);
+    applySavedVersion(sourceSlot.id, sourceResult.version);
   };
 
-  /** Drop an occupied pallet (from the floor or another shelf slot) into a shelf cell. */
+  /**
+   * Drop an occupied pallet (from the floor or another shelf cell) into a shelf cell.
+   * The pallet itself moves: once it has a parentId it is no longer part of the floor grid.
+   */
   const moveToShelf = async (sourceId: string, shelfId: string, level: number, column: number, row: number) => {
     const shelf = slots.find((s) => s.id === shelfId);
     const source = slots.find((s) => s.id === sourceId);
@@ -309,64 +312,68 @@ export function useFloorLayout() {
     const taken = slots.some(
       (s) => s.parentId === shelfId && s.level === level && s.cellColumn === column && s.cellRow === row
     );
-    if (taken) {
-      alert("That shelf slot already holds a pallet.");
-      return;
-    }
+    if (taken) return reject("that shelf slot already holds a pallet.");
 
-    // Already on a shelf: just change its cell (and shelf, if different).
-    if (source.parentId) {
-      const updated = { ...source, parentId: shelfId, level, cellColumn: column, cellRow: row };
-      setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
-      setSelectedSlot((prev) => (prev?.id === sourceId ? updated : prev));
+    const updated: PhysicalPallet = { ...source, parentId: shelfId, level, cellColumn: column, cellRow: row };
+    const restore = () => {
+      setSlots((prev) => prev.map((s) => (s.id === sourceId ? source : s)));
+      setSelectedSlot((prev) => (prev?.id === sourceId ? source : prev));
+    };
+
+    setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
+    setSelectedSlot((prev) => (prev?.id === sourceId ? updated : prev));
+    try {
       const result = await postSlot(updated);
       if (!result.ok) {
-        setSlots((prev) => prev.map((s) => (s.id === sourceId ? source : s)));
-        setSelectedSlot((prev) => (prev?.id === sourceId ? source : prev));
-        alert(`Unable to move pallet: ${result.error}`);
+        restore();
+        alert(`Unable to store pallet: ${result.error}`);
         return;
       }
       applySavedVersion(sourceId, result.version);
+    } catch (error) {
+      restore();
+      alert(`Unable to store pallet: ${error instanceof Error ? error.message : "Network error"}`);
+    }
+  };
+
+  /** Drop a shelved pallet on open floor: it leaves the shelf and snaps to the nearest open floor cell. */
+  const takeOffShelf = async (sourceId: string, xPct: number, yPct: number) => {
+    const source = slots.find((s) => s.id === sourceId);
+    if (!source || !source.parentId || source.bayId !== activeBay) return;
+
+    const position = findNearestOpenPosition(activeSlots, canvasSize, activeBay, xPct, yPct, source.id, source);
+    if (!position) {
+      alert("No open floor space is available for that pallet.");
       return;
     }
 
-    // From the floor: the pallet's contents go onto a new shelf record and the floor slot is emptied.
-    const stored: PhysicalPallet = {
-      id: nextStoredId(shelfId),
-      bayId: shelf.bayId,
-      itemType: "pallet",
-      widthCells: 1,
-      heightCells: 1,
-      isOccupied: true,
-      projectId: source.projectId,
-      notes: source.notes,
-      xPos: 0,
-      yPos: 0,
-      parentId: shelfId,
-      level,
-      cellColumn: column,
-      cellRow: row,
+    const updated: PhysicalPallet = {
+      ...source,
+      ...position,
+      parentId: undefined,
+      level: undefined,
+      cellColumn: undefined,
+      cellRow: undefined,
     };
-    const emptied = { ...source, isOccupied: false, projectId: "", notes: "" };
+    const restore = () => {
+      setSlots((prev) => prev.map((s) => (s.id === sourceId ? source : s)));
+      setSelectedSlot((prev) => (prev?.id === sourceId ? source : prev));
+    };
 
+    setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
+    setSelectedSlot((prev) => (prev?.id === sourceId ? updated : prev));
     try {
-      const created = await postSlot({ ...stored, action: "create" });
-      if (!created.ok) {
-        alert(`Unable to store pallet: ${created.error}`);
+      // null (not undefined) tells the API to clear the shelf placement.
+      const result = await postSlot({ ...updated, parentId: null, level: null, cellColumn: null, cellRow: null });
+      if (!result.ok) {
+        restore();
+        alert(`Unable to move pallet to the floor: ${result.error}`);
         return;
       }
-      const cleared = await postSlot(emptied);
-      if (!cleared.ok) {
-        await deleteSlot(stored.id); // roll back so the pallet isn't in two places
-        alert(`Unable to store pallet: ${cleared.error}`);
-        return;
-      }
-
-      setSlots((prev) => [...prev.map((s) => (s.id === source.id ? emptied : s)), stored]);
-      setSelectedSlot((prev) => (prev?.id === source.id ? stored : prev));
-      applySavedVersion(source.id, cleared.version);
+      applySavedVersion(sourceId, result.version);
     } catch (error) {
-      alert(`Unable to store pallet: ${error instanceof Error ? error.message : "Network error"}`);
+      restore();
+      alert(`Unable to move pallet to the floor: ${error instanceof Error ? error.message : "Network error"}`);
     }
   };
 
@@ -406,6 +413,7 @@ export function useFloorLayout() {
     moveZone,
     movePallet,
     moveToShelf,
+    takeOffShelf,
     storedCountFor: countStored,
   };
 }

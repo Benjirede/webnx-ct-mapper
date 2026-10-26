@@ -40,6 +40,7 @@ export default function FloorGrid() {
             expandedShelfId={layout.expandedShelfId}
             onCloseShelf={layout.closeShelf}
             onShelfDrop={layout.moveToShelf}
+            onShelfPalletDrop={layout.takeOffShelf}
         />
 
         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl h-fit flex flex-col space-y-4">

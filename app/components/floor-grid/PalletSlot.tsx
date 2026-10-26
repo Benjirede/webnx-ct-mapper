@@ -40,6 +40,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
     const dragType = e.dataTransfer.getData("text/drag-type");
     const sourceId = e.dataTransfer.getData("text/source-id");
     if (isAdminMode || dragType !== "move-payload" || slot.itemType !== "pallet") return;
+    e.stopPropagation();
     onPalletDrop(sourceId, slot);
   };
 

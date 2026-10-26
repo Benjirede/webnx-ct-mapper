@@ -26,13 +26,14 @@ interface Props {
   shelfContents: PhysicalPallet[];
   expandedShelfId: string | null;
   onCloseShelf: () => void;
+  onShelfPalletDrop: (sourceId: string, xPct: number, yPct: number) => void;
   onShelfDrop: (sourceId: string, shelfId: string, level: number, column: number, row: number) => void;
 }
 
 export default function FloorCanvas({
   slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onPalletDrop, onZoneMove, onCanvasSizeChange,
   isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
-  shelfContents, expandedShelfId, onCloseShelf, onShelfDrop,
+  shelfContents, expandedShelfId, onCloseShelf, onShelfDrop, onShelfPalletDrop,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -122,16 +123,20 @@ export default function FloorCanvas({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!canvasRef.current || !isAdminMode) return;
+    if (!canvasRef.current) return;
 
     const dragType = e.dataTransfer.getData("text/drag-type");
     const sourceId = e.dataTransfer.getData("text/source-id");
-    if (dragType !== "move-zone" || !sourceId) return;
+    if (!sourceId) return;
+    const isZoneMove = dragType === "move-zone" && isAdminMode;
+    if (!isZoneMove && dragType !== "move-payload") return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left - canvasRef.current.clientLeft) / canvasRef.current.clientWidth) * 100;
     const yPct = ((e.clientY - rect.top - canvasRef.current.clientTop) / canvasRef.current.clientHeight) * 100;
-    onZoneMove(sourceId, xPct, yPct);
+    // Zones are repositioned in blueprint mode; a shelved pallet dropped on open floor is taken off its shelf.
+    if (isZoneMove) onZoneMove(sourceId, xPct, yPct);
+    else onShelfPalletDrop(sourceId, xPct, yPct);
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
