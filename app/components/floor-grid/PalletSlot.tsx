@@ -1,4 +1,4 @@
-import { FLOOR_ITEM_LABELS, type FloorItemType, type PhysicalPallet } from "./types";
+import { FLOOR_ITEM_LABELS, getLevelCount, type FloorItemType, type PhysicalPallet } from "./types";
 import { CELL_HEIGHT, CELL_WIDTH } from "./layoutPositions";
 import styles from "./PalletSlot.module.css";
 
@@ -19,11 +19,17 @@ interface Props {
   isSelected: boolean;
   matchesSearch: boolean;
   scale: number;
+  storedCount: number;
+  isExpanded: boolean;
   onSelect: (slot: PhysicalPallet) => void;
   onPalletDrop: (sourceId: string, target: PhysicalPallet) => void;
 }
 
-export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearch, scale, onSelect, onPalletDrop }: Props) {
+export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearch, scale, storedCount, isExpanded, onSelect, onPalletDrop }: Props) {
+  const levelCount = getLevelCount(slot);
+  const isContainer = levelCount > 0;
+  const capacity = slot.widthCells * slot.heightCells * levelCount;
+
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/source-id", slot.id);
     e.dataTransfer.setData("text/drag-type", isAdminMode ? "move-zone" : "move-payload");
@@ -34,6 +40,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
     const dragType = e.dataTransfer.getData("text/drag-type");
     const sourceId = e.dataTransfer.getData("text/source-id");
     if (isAdminMode || dragType !== "move-payload" || slot.itemType !== "pallet") return;
+    e.stopPropagation();
     onPalletDrop(sourceId, slot);
   };
 
@@ -50,6 +57,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
     >
       <button
         type="button"
+        aria-expanded={isContainer ? isExpanded : undefined}
         onClick={() => onSelect(slot)}
         draggable={isAdminMode || (slot.itemType === "pallet" && slot.isOccupied)}
         onDragStart={handleDragStart}
@@ -82,7 +90,9 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
         <span className="truncate text-[9px] font-medium">
           {slot.itemType === "pallet" && slot.isOccupied
             ? `ID: ${slot.projectId}`
-            : FLOOR_ITEM_LABELS[slot.itemType]}
+            : isContainer
+              ? `${storedCount}/${capacity} stored ${isExpanded ? "\u25B4" : "\u25BE"}`
+              : FLOOR_ITEM_LABELS[slot.itemType]}
         </span>
       </button>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { PhysicalPallet, type GridFootprint } from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
+import ShelfView from "./ShelfView";
 import { CELL_HEIGHT, CELL_WIDTH, getBayGridSize, type CanvasSize } from "./layoutPositions";
 import type { BayId } from "./types";
 import styles from "./FloorCanvas.module.css";
@@ -22,11 +23,17 @@ interface Props {
   placementAvailable: boolean;
   onFootprintChange: (footprint: GridFootprint | null) => void;
   onFinishPlacement: () => void;
+  shelfContents: PhysicalPallet[];
+  expandedShelfId: string | null;
+  onCloseShelf: () => void;
+  onShelfPalletDrop: (sourceId: string, xPct: number, yPct: number) => void;
+  onShelfDrop: (sourceId: string, shelfId: string, level: number, column: number, row: number) => void;
 }
 
 export default function FloorCanvas({
   slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onPalletDrop, onZoneMove, onCanvasSizeChange,
   isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
+  shelfContents, expandedShelfId, onCloseShelf, onShelfDrop, onShelfPalletDrop,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -116,20 +123,24 @@ export default function FloorCanvas({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!canvasRef.current || !isAdminMode) return;
+    if (!canvasRef.current) return;
 
     const dragType = e.dataTransfer.getData("text/drag-type");
     const sourceId = e.dataTransfer.getData("text/source-id");
-    if (dragType !== "move-zone" || !sourceId) return;
+    if (!sourceId) return;
+    const isZoneMove = dragType === "move-zone" && isAdminMode;
+    if (!isZoneMove && dragType !== "move-payload") return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left - canvasRef.current.clientLeft) / canvasRef.current.clientWidth) * 100;
     const yPct = ((e.clientY - rect.top - canvasRef.current.clientTop) / canvasRef.current.clientHeight) * 100;
-    onZoneMove(sourceId, xPct, yPct);
+    // Zones are repositioned in blueprint mode; a shelved pallet dropped on open floor is taken off its shelf.
+    if (isZoneMove) onZoneMove(sourceId, xPct, yPct);
+    else onShelfPalletDrop(sourceId, xPct, yPct);
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    if (e.button !== 0 || (e.target as HTMLElement).closest("button, [data-no-pan]")) return;
 
     const viewport = e.currentTarget;
     if (isAdminMode && isPlacingItem) {
@@ -211,6 +222,15 @@ export default function FloorCanvas({
   };
 
   const query = searchQuery.trim().toLowerCase();
+  const expandedShelf = expandedShelfId ? slots.find((slot) => slot.id === expandedShelfId) : undefined;
+  const storedByShelf = new Map<string, PhysicalPallet[]>();
+  for (const pallet of shelfContents) {
+    if (!pallet.parentId) continue;
+    const list = storedByShelf.get(pallet.parentId);
+    if (list) list.push(pallet);
+    else storedByShelf.set(pallet.parentId, [pallet]);
+  }
+  const matchesQuery = (pallet: PhysicalPallet) => pallet.projectId.toLowerCase().includes(query);
 
   return (
     <section ref={sectionRef} className={`${styles.fullscreenSection} lg:col-span-3 min-w-0`}>
@@ -271,24 +291,37 @@ export default function FloorCanvas({
             />
           )}
 
-          <div className="absolute left-[35%] top-0 bottom-0 border-r border-dashed border-gray-800/60 pointer-events-none flex items-center justify-center">
-            <span className="text-[10px] uppercase font-mono tracking-widest text-gray-700 select-none rotate-90">
-              Main Tech Walking Lane
-            </span>
-          </div>
-
           {slots.map((slot) => (
             <PalletSlot
               key={slot.id}
               slot={slot}
               isAdminMode={isAdminMode}
               isSelected={selectedSlot?.id === slot.id}
-              matchesSearch={query !== "" && slot.projectId.toLowerCase().includes(query)}
+              matchesSearch={query !== "" && (matchesQuery(slot) || (storedByShelf.get(slot.id) ?? []).some(matchesQuery))}
               scale={canvasScale}
+              storedCount={storedByShelf.get(slot.id)?.length ?? 0}
+              isExpanded={slot.id === expandedShelfId}
               onSelect={onSelect}
               onPalletDrop={onPalletDrop}
             />
           ))}
+
+          {expandedShelf && (
+            <ShelfView
+              key={expandedShelf.id}
+              shelf={expandedShelf}
+              contents={storedByShelf.get(expandedShelf.id) ?? []}
+              selectedId={selectedSlot?.id ?? null}
+              query={query}
+              isAdminMode={isAdminMode}
+              scale={canvasScale}
+              canvasWidth={gridSize.columns * cellWidth}
+              canvasHeight={gridSize.rows * cellHeight}
+              onClose={onCloseShelf}
+              onSelect={onSelect}
+              onDropPallet={(sourceId, level, column, row) => onShelfDrop(sourceId, expandedShelf.id, level, column, row)}
+            />
+          )}
         </div>
       </div>
     </section>

@@ -72,7 +72,7 @@ npm install
 npm run dev
 ```
 
-If the error persists, install the binaries directly:
+If the error persists, install the bmkminaries directly:
 
 ```bash
 npm install -D @tailwindcss/oxide-linux-x64-gnu lightningcss-linux-x64-gnu

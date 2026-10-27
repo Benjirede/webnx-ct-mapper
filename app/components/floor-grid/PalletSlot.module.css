@@ -21,12 +21,16 @@
 
 .pallet {
   border-radius: 0.375rem;
+  background-color: #11aae7;
+  border-color: #111111;
+  color: #e74e11;
 }
 
 .walkingLane {
   border-color: #94a3b8;
   border-style: dashed;
-  background: repeating-linear-gradient(135deg, #1e293b 0 0.5rem, #334155 0.5rem 1rem);
+  background: repeating-linear-gradient(135deg, #1e293b 0 0.5rem, 
+#334155 0.5rem 1rem);
   color: #f1f5f9;
 }
 
@@ -38,37 +42,37 @@
 }
 
 .shelf {
-  border-color: #34d399;
+  border-color: #fdba74;
   border-radius: 0.2rem;
-  background: #064e3b;
-  color: #d1fae5;
+  background: #e74e11;
+  color: #fff7ed;
 }
 
 .rack {
-  border-color: #2dd4bf;
+  border-color: #a1a1aa;
   border-radius: 0.2rem;
-  background: #134e4a;
-  color: #ccfbf1;
+  background: #111111;
+  color: #e5e7eb;
 }
 
 .island {
-  border-color: #c4b5fd;
+  border-color: #93c5fd;
   border-radius: 1rem;
-  background: #4c1d95;
-  color: #ede9fe;
+  background: #1e3a8a;
+  color: #dbeafe;
 }
 
 .workbench {
-  border-color: #22d3ee;
+  border-color: #4ade80;
   border-radius: 0.25rem;
-  background: #164e63;
-  color: #cffafe;
+  background: #14532d;
+  color: #dcfce7;
 }
 
 .other {
-  border-color: #fb7185;
+  border-color: #9ca3af;
   border-style: dotted;
   border-radius: 0.75rem;
-  background: #881337;
-  color: #ffe4e6;
+  background: #374151;
+  color: #f3f4f6;
 }
