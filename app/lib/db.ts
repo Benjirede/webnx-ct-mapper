@@ -1,19 +1,19 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
+// Database path via environment variable or default to local file
 let dbPath = process.env.DATABASE_URL;
 if (!dbPath) {
-  dbPath = path.resolve(__dirname, '..', '..', '..', 'webnx_floor.db');
+  dbPath = path.resolve(process.cwd(), 'webnx_floor.db');
 }
 
-// Open the database with a built-in timeout pool so it gracefully waits out local locks
+// Initalize SQLite with 5s timeout to handle Next.js HMR file locks
 const db = new Database(dbPath, { timeout: 5000 });
 
 try {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 } catch (err: any) {
-  // If we are currently compiling inside a Docker sandbox and hit a locked asset, print warning and continue
   if (err.code === 'SQLITE_BUSY') {
     console.warn("⚠️ Database is busy/locked by host process. Proceeding with static compilation wrapper...");
   } else {
@@ -21,6 +21,7 @@ try {
   }
 }
 
+//initialize db schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS pallet_slots (
     id TEXT PRIMARY KEY,
