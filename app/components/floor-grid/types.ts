@@ -37,8 +37,8 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
   other: "Other"
 };
 
-// shelf details
-export const LEVELED_ITEM_TYPES: readonly FloorItemType[] = ["shelf", "rack"];
+// shelf details, we can add more items here
+export const LEVELED_ITEM_TYPES: readonly FloorItemType[] = ["shelf"];
 export const LEVEL_OPTIONS = [1, 2,3,4] as const;
 export const DEFAULT_LEVEL = 1;
 
