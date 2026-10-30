@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   FLOOR_ITEM_LABELS,
   FLOOR_ITEM_TYPES,
   DEFAULT_LEVEL,
   LEVEL_OPTIONS,
   hasLevels,
-  getDeleteBlockedReason,
   type FloorItemType,
   type GridFootprint,
   type PhysicalPallet,
 } from "./types";
-import DeleteItemButton from "./DeleteItemButton";
+import InspectorPanel from "./InspectorPanel";
+
+type InspectorProps = ComponentProps<typeof InspectorPanel>;
 
 interface Props {
   selectedSlot: PhysicalPallet | null;
@@ -20,23 +21,22 @@ interface Props {
   placementAvailable: boolean;
   onStartPlacement: () => void;
   onCancelPlacement: () => void;
-  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint, levels?: number,) => Promise<boolean>;
-  onRename: (newName: string) => void;
-  onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
+  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint, levels?: number) => Promise<boolean>;
+  /** The same handlers the Staging Inspector uses. Renaming the ID happens inside the inspector. */
+  onSave: InspectorProps["onSave"];
+  onRename?: InspectorProps["onRename"];
+  onDelete: InspectorProps["onDelete"];
 }
 
 export default function AdminPanel({
   selectedSlot, selectedStoredCount, isPlacingItem, pendingFootprint, placementAvailable,
-  onStartPlacement, onCancelPlacement, onCreate, onRename,
-  onDelete,
+  onStartPlacement, onCancelPlacement, onCreate, onSave, onRename, onDelete,
 }: Props) {
   const [newSlotId, setNewSlotId] = useState("");
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
   const [levels, setLevels] = useState<number>(DEFAULT_LEVEL);
-  const [renameValue, setRenameValue] = useState(selectedSlot?.id ?? "");
 
   const itemHasLevels = hasLevels(itemType);
-  const deleteBlockedReason = selectedSlot ? getDeleteBlockedReason(selectedSlot, selectedStoredCount) : undefined;
 
   const handleCreate = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,7 +52,7 @@ export default function AdminPanel({
   };
 
   return (
-    <div className="space-y-6 back">
+    <div className="space-y-6">
       <header className="border-b border-gray-700 pb-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300">Layout Controls</p>
         <h2 className="mt-1 text-lg font-semibold text-gray-100">Add Floor Item</h2>
@@ -162,39 +162,16 @@ export default function AdminPanel({
       </section>
 
       {selectedSlot && (
-        // key resets the rename field whenever a different zone is selected
-        <section key={selectedSlot.id} aria-labelledby="selected-item-title" className="space-y-3 border-t border-gray-700 pt-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Selected item</p>
-              <h3 id="selected-item-title" className="mt-0.5 truncate text-sm font-semibold text-gray-100">{selectedSlot.id}</h3>
-            </div>
-            <DeleteItemButton itemId={selectedSlot.id} onDelete={onDelete} disabledReason={deleteBlockedReason} />
-          </div>
-          {deleteBlockedReason && (
-            <p role="note" className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">
-              {deleteBlockedReason}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <label htmlFor="rename-item-id" className="sr-only">New item ID</label>
-            <input
-              id="rename-item-id"
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
-            />
-            <button
-              type="button"
-              onClick={() => onRename(renameValue)}
-              className="rounded-md border border-gray-600 px-3 py-2 text-sm font-semibold text-gray-100 transition-colors hover:border-emerald-400/70 hover:bg-emerald-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-            >
-              Rename
-            </button>
-            
-            
-          </div>
+        <section aria-label="Selected item" className="space-y-4 border-t border-gray-700 pt-5">
+          {/* key resets the inspector's fields whenever a different item is selected */}
+          <InspectorPanel
+            key={selectedSlot.id}
+            slot={selectedSlot}
+            storedCount={selectedStoredCount}
+            onSave={onSave}
+            onRename={onRename}
+            onDelete={onDelete}
+          />
         </section>
       )}
     </div>

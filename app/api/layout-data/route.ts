@@ -374,7 +374,7 @@ export async function DELETE(request: Request) {
         return { status: 400, error: `Zone still holds ${stored.count} pallet${stored.count === 1 ? "" : "s"}. Move them off before deleting.` };
       }
 
-      if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied, please remove Project Name and any Pallet Info" };
+      if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied, please ensure Item is Empty." };
 
       db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(targetId);
       db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, NULL, ?)')

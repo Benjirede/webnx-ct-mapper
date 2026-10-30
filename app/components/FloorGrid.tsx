@@ -55,6 +55,7 @@ export default function FloorGrid() {
               placementAvailable={layout.placementAvailable}
               onStartPlacement={layout.startItemPlacement}
               onCancelPlacement={layout.cancelPalletPlacement}
+              onSave={layout.saveDetails}
               onRename={layout.renameZone}
               onDelete={layout.deleteZone}
             />
