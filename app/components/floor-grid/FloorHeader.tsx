@@ -27,7 +27,7 @@ export default function FloorHeader({ isAdminMode, searchQuery, onToggleAdmin, o
 
         <input
           type="text"
-          placeholder="🔍 Search Project..."
+          placeholder="🔍 Search ID, name, notes..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400 placeholder-gray-500 shadow-md w-64"

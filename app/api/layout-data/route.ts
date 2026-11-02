@@ -9,6 +9,9 @@ import {
   hasLevels,
   isBayId,
   isFloorItemType,
+  MAX_ITEM_ID_LENGTH,
+  MAX_NOTES_LENGTH,
+  MAX_PROJECT_NAME_LENGTH,
 } from "@/app/components/floor-grid/types";
 
 const SECRET_ADMIN_PIN = "1234";
@@ -94,8 +97,16 @@ export async function POST(request: Request) {
     // SUB-ROUTING INTENT A: ATOMIC SINGLE-TRANSACTION PALLET MOVEMENT
     // ------------------------------------------------------------------------
     if (body.action === "move_pallet") {
-      const sourceId = body.sourceId?.trim().toUpperCase();
-      const targetId = body.targetId?.trim().toUpperCase();
+      if (
+        typeof body.sourceId !== "string" ||
+        typeof body.targetId !== "string" ||
+        body.sourceId.trim().length > MAX_ITEM_ID_LENGTH ||
+        body.targetId.trim().length > MAX_ITEM_ID_LENGTH
+      ) {
+        return NextResponse.json({ error: "Source and target IDs must be 10 characters or fewer" }, { status: 400 });
+      }
+      const sourceId = body.sourceId.trim().toUpperCase();
+      const targetId = body.targetId.trim().toUpperCase();
 
       if (!sourceId || !targetId) {
         return NextResponse.json({ error: "Source and Target fields are required" }, { status: 400 });
@@ -154,8 +165,17 @@ export async function POST(request: Request) {
     // ------------------------------------------------------------------------
     // CONCURRENCY & AUTH SECURITY PRE-FLIGHT VERIFICATIONS
     // ------------------------------------------------------------------------
-    const targetId = body.id?.trim().toUpperCase();
+    if (typeof body.id !== "string") {
+      return NextResponse.json({ error: "A valid item ID is required" }, { status: 400 });
+    }
+    const targetId = body.id.trim().toUpperCase();
     if (!targetId) return NextResponse.json({ error: "Missing identity context code: 'id'" }, { status: 400 });
+    if (
+      (body.action === "create" || body.action === "rename") &&
+      targetId.length > MAX_ITEM_ID_LENGTH
+    ) {
+      return NextResponse.json({ error: "Item IDs must be 10 characters or fewer" }, { status: 400 });
+    }
 
     const oldRow = db.prepare('SELECT * FROM pallet_slots WHERE id = ?').get(targetId) as any;
 
@@ -257,6 +277,19 @@ export async function POST(request: Request) {
     // SUB-ROUTING INTENT C: STANDARD INLINE DATA VALUE MUTATIONS
     // ------------------------------------------------------------------------
     if (!oldRow) return NextResponse.json({ error: "Node unmapped" }, { status: 404 });
+
+    if (
+      body.projectId !== undefined &&
+      (typeof body.projectId !== "string" || body.projectId.length > MAX_PROJECT_NAME_LENGTH)
+    ) {
+      return NextResponse.json({ error: "Names must be 36 characters or fewer" }, { status: 400 });
+    }
+    if (
+      body.notes !== undefined &&
+      (typeof body.notes !== "string" || body.notes.length > MAX_NOTES_LENGTH)
+    ) {
+      return NextResponse.json({ error: "Notes must be 4000 characters or fewer" }, { status: 400 });
+    }
 
     const updatedOccupied = typeof body.isOccupied === "boolean" ? (body.isOccupied ? 1 : 0) : oldRow.is_occupied;
     const updatedProjectId = typeof body.projectId === "string" ? body.projectId : oldRow.project_id;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CELL_HEIGHT, CELL_WIDTH } from "./layoutPositions";
-import { FLOOR_ITEM_LABELS, getLevelCount, type PhysicalPallet } from "./types";
+import { FLOOR_ITEM_LABELS, getLevelCount, matchesSearchQuery, type PhysicalPallet } from "./types";
+import slotStyles from "./PalletSlot.module.css";
 
 const PANEL_MIN_WIDTH = 248;
 const PANEL_PADDING = 12;
@@ -249,9 +250,7 @@ export default function ShelfView({
                     className={`flex h-full w-full flex-col justify-between rounded border border-amber-500 bg-amber-950/80 px-1.5 py-1 text-left text-amber-200 shadow-lg transition-all ${
                       "cursor-grab active:cursor-grabbing"
                     } ${selectedId === pallet.id ? "ring-2 ring-emerald-400" : ""} ${
-                      query !== "" && pallet.projectId.toLowerCase().includes(query)
-                        ? "ring-4 ring-cyan-400 animate-bounce"
-                        : ""
+                      matchesSearchQuery(pallet, query) ? slotStyles.searchMatch : ""
                     }`}
                   >
                     <span className="truncate text-[9px] font-mono font-bold text-gray-100">{pallet.id}</span>

@@ -41,6 +41,9 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
 export const LEVELED_ITEM_TYPES: readonly FloorItemType[] = ["shelf"];
 export const LEVEL_OPTIONS = [1, 2,3,4] as const;
 export const DEFAULT_LEVEL = 1;
+export const MAX_ITEM_ID_LENGTH = 10;
+export const MAX_PROJECT_NAME_LENGTH = 36;
+export const MAX_NOTES_LENGTH = 4000;
 
 export const hasLevels = (type: FloorItemType): boolean =>
   LEVELED_ITEM_TYPES.includes(type);
@@ -70,6 +73,14 @@ export interface PhysicalPallet {
   /** Stored pallets only: 0-based cell inside the shelf footprint. */
   cellColumn?: number;
   cellRow?: number;
+}
+
+export function matchesSearchQuery(item: PhysicalPallet, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return false;
+
+  return [item.id, item.projectId, item.notes ?? ""]
+    .some((value) => value.toLowerCase().includes(normalizedQuery));
 }
 
 /** Number of levels for a shelf/rack; 0 for anything that can't hold pallets. */

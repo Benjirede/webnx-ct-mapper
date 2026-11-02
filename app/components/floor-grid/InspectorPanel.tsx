@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { FLOOR_ITEM_LABELS, getDeleteBlockedReason, getLevelCount, type PhysicalPallet } from "./types";
+import {
+  FLOOR_ITEM_LABELS,
+  getDeleteBlockedReason,
+  getLevelCount,
+  MAX_ITEM_ID_LENGTH,
+  MAX_NOTES_LENGTH,
+  MAX_PROJECT_NAME_LENGTH,
+  type PhysicalPallet,
+} from "./types";
 import DeleteItemButton from "./DeleteItemButton";
 
 interface Props {
@@ -26,9 +34,13 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
 
   const normalizedId = renameValue.trim().toUpperCase();
   const isIdEdited = !!onRename && normalizedId !== "" && normalizedId !== slot.id;
+  const isIdTooLong = !!onRename && normalizedId.length > MAX_ITEM_ID_LENGTH;
+  const isProjectNameTooLong = projectId.length > MAX_PROJECT_NAME_LENGTH;
+  const areNotesTooLong = notes.length > MAX_NOTES_LENGTH;
 
   // One button covers both: data edits and an ID change.
   const hasChanges = isDataChanged || isIdEdited;
+  const hasValidationErrors = isIdTooLong || isProjectNameTooLong || areNotesTooLong;
 
   const isPallet = slot.itemType === "pallet";
   const typeLabel = FLOOR_ITEM_LABELS[slot.itemType];
@@ -45,7 +57,7 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
   useEffect(() => () => clearTimeout(timer.current), []);
 
   async function handleSubmit() {
-    if (!hasChanges || status === "saving") return;
+    if (!hasChanges || hasValidationErrors || status === "saving") return;
     clearTimeout(timer.current);
     setRenameError("");
     setStatus("saving");
@@ -105,9 +117,17 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
               id="inspector-id"
               type="text"
               value={renameValue}
+              maxLength={MAX_ITEM_ID_LENGTH}
+              required
               onChange={(e) => setRenameValue(e.target.value)}
+              aria-invalid={isIdTooLong}
+              aria-describedby="inspector-id-limit"
               className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono uppercase text-emerald-300 focus:outline-none focus:border-emerald-400"
             />
+            <p id="inspector-id-limit" className={`mt-1 text-xs ${isIdTooLong ? "text-red-400" : "text-gray-500"}`}>
+              {renameValue.length}/{MAX_ITEM_ID_LENGTH} characters
+              {isIdTooLong && " — item ID must be 10 characters or fewer."}
+            </p>
             {renameError && (
               <p role="alert" className="mt-1 text-xs text-red-400">{renameError}</p>
             )}
@@ -127,9 +147,16 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
               type="text"
               placeholder="Enter pallet name..."
               value={projectId}
+              maxLength={MAX_PROJECT_NAME_LENGTH}
               onChange={(e) => setProjectId(e.target.value)}
+              aria-invalid={isProjectNameTooLong}
+              aria-describedby="inspector-project-limit"
               className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400"
             />
+            <p id="inspector-project-limit" className={`mt-1 text-xs ${isProjectNameTooLong ? "text-red-400" : "text-gray-500"}`}>
+              {projectId.length}/{MAX_PROJECT_NAME_LENGTH} characters
+              {isProjectNameTooLong && " — name must be 36 characters or fewer."}
+            </p>
           </div>
         ) : (
           <div className="rounded border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
@@ -167,15 +194,22 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
                 : `Add notes here`
             }
             value={notes}
+            maxLength={MAX_NOTES_LENGTH}
             onChange={(e) => setNotes(e.target.value)}
+            aria-invalid={areNotesTooLong}
+            aria-describedby="inspector-notes-limit"
             className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-400 resize-none"
           />
+          <p id="inspector-notes-limit" className={`text-xs ${areNotesTooLong ? "text-red-400" : "text-gray-500"}`}>
+            {notes.length}/{MAX_NOTES_LENGTH} characters
+            {areNotesTooLong && " — notes must be 4000 characters or fewer."}
+          </p>
         </div>
 
         <div className="space-y-2">
           <button
             type="submit"
-            disabled={!hasChanges || status === "saving"}
+            disabled={!hasChanges || hasValidationErrors || status === "saving"}
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-2 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
           >
             {status === "saving" ? "Saving..." : "Save Changes"}

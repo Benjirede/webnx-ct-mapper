@@ -5,6 +5,7 @@ import {
   DEFAULT_LEVEL,
   LEVEL_OPTIONS,
   hasLevels,
+  MAX_ITEM_ID_LENGTH,
   type FloorItemType,
   type GridFootprint,
   type PhysicalPallet,
@@ -40,7 +41,12 @@ export default function AdminPanel({
 
   const handleCreate = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!pendingFootprint || !placementAvailable) return;
+    if (
+      !pendingFootprint ||
+      !placementAvailable ||
+      !newSlotId.trim() ||
+      newSlotId.trim().length > MAX_ITEM_ID_LENGTH
+    ) return;
     const levelsText = itemHasLevels ? `, ${levels} ${levels === 1 ? "level" : "levels"}` : "";
     const confirmation = `Create ${newSlotId.trim()} as ${FLOOR_ITEM_LABELS[itemType]} (${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} cells${levelsText}) in this bay?`;
     if (!window.confirm(confirmation)) return;
@@ -71,9 +77,15 @@ export default function AdminPanel({
               type="text"
               placeholder="e.g. DESK-C1"
               value={newSlotId}
+              maxLength={MAX_ITEM_ID_LENGTH}
+              required
               onChange={(e) => setNewSlotId(e.target.value)}
+              aria-describedby="new-pallet-id-limit"
               className="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-500 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
             />
+            <p id="new-pallet-id-limit" className="text-xs text-gray-500">
+              {newSlotId.length}/{MAX_ITEM_ID_LENGTH} characters
+            </p>
           </div>
 
           <div className="space-y-1.5">

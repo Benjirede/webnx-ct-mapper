@@ -53,7 +53,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
       }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
-      className={styles.positioner}
+      className={`${styles.positioner} ${matchesSearch ? styles.searchMatchPositioner : ""}`}
     >
       <button
         type="button"
@@ -74,7 +74,7 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
                 : "border-gray-600 text-gray-100 cursor-pointer"
               : "cursor-pointer"
         } ${isSelected ? "ring-2 ring-emerald-400 border-transparent z-10 scale-105" : ""} ${
-          matchesSearch ? "ring-4 ring-cyan-400 border-transparent z-20 scale-110 animate-bounce" : ""
+          matchesSearch ? styles.searchMatch : ""
         }`}
       >
         <div className="flex justify-between items-start w-full">
