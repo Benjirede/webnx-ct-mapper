@@ -41,9 +41,9 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
 export const LEVELED_ITEM_TYPES: readonly FloorItemType[] = ["shelf"];
 export const LEVEL_OPTIONS = [1, 2,3,4] as const;
 export const DEFAULT_LEVEL = 1;
-export const MAX_ITEM_ID_LENGTH = 10;
-export const MAX_PROJECT_NAME_LENGTH = 36;
-export const MAX_NOTES_LENGTH = 4000;
+export const MAX_ITEM_ID_LENGTH = 30;
+export const MAX_PROJECT_NAME_LENGTH = 64;
+export const MAX_NOTES_LENGTH = 8000;
 
 export const hasLevels = (type: FloorItemType): boolean =>
   LEVELED_ITEM_TYPES.includes(type);

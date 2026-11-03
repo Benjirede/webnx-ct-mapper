@@ -13,11 +13,11 @@ export interface GridDimensions {
 
 //adjust bay sizes based on real-world dimensions and layout
 export const BAY_GRID_SIZES: Record<BayId, GridDimensions> = {
-  bay1: { columns: 12, rows: 30 },
+  bay1: { columns: 24, rows: 30 },
   bay2: { columns: 12, rows: 30 },
   bay3: { columns: 12, rows: 30 },
   bay4: { columns: 12, rows: 30 },
-  bay5: { columns: 12, rows: 30 },
+  bay5: { columns: 24, rows: 30 },
 };
 
 export function getBayGridSize(bayId: BayId) {
