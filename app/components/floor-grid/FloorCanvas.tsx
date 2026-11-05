@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { PhysicalPallet, type GridFootprint } from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
