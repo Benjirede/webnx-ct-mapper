@@ -35,16 +35,52 @@
   position: sticky;
   z-index: 30;
   top: 0.75rem;
+  left: 0.75rem;
+  box-sizing: border-box;
   display: flex;
+  width: calc(100% - 1.5rem);
+  flex-wrap: wrap;
   min-height: 2.5rem;
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
-  margin: 0.75rem;
+  margin: 0.75rem 0;
   pointer-events: none;
 }
 
+.toolbarStatus {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.zoomControls {
+  flex: 0 0 auto;
+}
+
+.zoomReadout {
+  display: inline-flex;
+  min-width: 3.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  padding-inline: 0.25rem;
+  color: #e5e7eb;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.75rem;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.zoomReadout:hover {
+  background: #374151;
+  color: #fff;
+}
+
 .fullscreenButton {
+  flex: 0 0 auto;
   cursor: pointer;
   pointer-events: auto;
 }
@@ -89,6 +125,23 @@
   pointer-events: none;
 }
 
+.dropPreview {
+  position: absolute;
+  z-index: 40;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border: 2px solid;
+  pointer-events: none;
+}
+
+.dropPreviewAvailable {
+  border-color: #34d399;
+}
+
+.dropPreviewBlocked {
+  border-color: #fb7185;
+}
+
 .placementAvailable {
   border-color: #34d399;
   background: rgb(16 185 129 / 0.2);
@@ -102,5 +155,28 @@
 @media (max-width: 640px) {
   .viewport {
     height: min(62dvh, calc(100dvh - 23rem));
+  }
+
+  .viewportToolbar {
+    top: 0.5rem;
+    left: 0.5rem;
+    width: calc(100% - 1rem);
+    margin: 0.5rem 0;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .zoomControls,
+  .fullscreenButton {
+    flex-basis: 100%;
+  }
+
+  .zoomControls {
+    justify-content: space-between;
+  }
+
+  .fullscreenButton {
+    width: 100%;
   }
 }

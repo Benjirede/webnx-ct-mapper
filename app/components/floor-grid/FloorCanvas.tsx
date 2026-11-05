@@ -1,11 +1,23 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { matchesSearchQuery, type PhysicalPallet, type GridFootprint } from "./types";
+import { PhysicalPallet, type GridFootprint } from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
 import ShelfView from "./ShelfView";
-import { CELL_HEIGHT, CELL_WIDTH, getBayGridSize, type CanvasSize } from "./layoutPositions";
+import { CELL_HEIGHT, CELL_WIDTH, findNearestOpenPosition, getBayGridSize, type CanvasSize } from "./layoutPositions";
 import type { BayId } from "./types";
 import styles from "./FloorCanvas.module.css";
+
+const MIN_ZOOM = 50;
+const MAX_ZOOM = 200;
+const ZOOM_STEP = 10;
+
+interface DropPreview {
+  xPct: number;
+  yPct: number;
+  widthCells: number;
+  heightCells: number;
+  isValid: boolean;
+}
 
 interface Props {
   slots: PhysicalPallet[];
@@ -40,15 +52,33 @@ export default function FloorCanvas({
   const sectionRef = useRef<HTMLElement>(null);
   const panStartRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   const placementStartRef = useRef<{ pointerId: number; column: number; row: number } | null>(null);
+  const zoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [draggedSlot, setDraggedSlot] = useState<PhysicalPallet | null>(null);
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
   const gridSize = getBayGridSize(activeBay);
-  const canvasScale = isFullscreen && viewportWidth > 0
+  const fitScale = isFullscreen && viewportWidth > 0
     ? Math.min(1, viewportWidth / (gridSize.columns * CELL_WIDTH))
     : 1;
+  const canvasScale = fitScale * zoomLevel / 100;
   const cellWidth = CELL_WIDTH * canvasScale;
   const cellHeight = CELL_HEIGHT * canvasScale;
+
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const viewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (!anchor || !viewport || !canvas) return;
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    viewport.scrollLeft += canvasRect.left + anchor.x * canvasRect.width - viewportRect.left - viewport.clientWidth / 2;
+    viewport.scrollTop += canvasRect.top + anchor.y * canvasRect.height - viewportRect.top - viewport.clientHeight / 2;
+    zoomAnchorRef.current = null;
+  }, [zoomLevel]);
 
   const centerViewportOnSlots = useEffectEvent(() => {
     const viewport = viewportRef.current;
@@ -121,8 +151,26 @@ export default function FloorCanvas({
     }
   };
 
+  const changeZoom = (nextZoom: number) => {
+    const nextLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+    if (nextLevel === zoomLevel) return;
+
+    const viewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (viewport && canvas) {
+      const viewportRect = viewport.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      zoomAnchorRef.current = {
+        x: Math.max(0, Math.min(1, (viewportRect.left + viewport.clientWidth / 2 - canvasRect.left) / canvasRect.width)),
+        y: Math.max(0, Math.min(1, (viewportRect.top + viewport.clientHeight / 2 - canvasRect.top) / canvasRect.height)),
+      };
+    }
+    setZoomLevel(nextLevel);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setDropPreview(null);
     if (!canvasRef.current) return;
 
     const dragType = e.dataTransfer.getData("text/drag-type");
@@ -137,6 +185,64 @@ export default function FloorCanvas({
     // Zones are repositioned in blueprint mode; a shelved pallet dropped on open floor is taken off its shelf.
     if (isZoneMove) onZoneMove(sourceId, xPct, yPct);
     else onShelfPalletDrop(sourceId, xPct, yPct);
+  };
+
+  const handleCanvasDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas || !draggedSlot) return;
+
+    const targetElement = (e.target as HTMLElement).closest<HTMLElement>("[data-floor-slot-id]");
+    const targetSlot = targetElement
+      ? slots.find((slot) => slot.id === targetElement.dataset.floorSlotId)
+      : undefined;
+    if (
+      !isAdminMode && draggedSlot.itemType === "pallet" && draggedSlot.isOccupied &&
+      targetSlot?.itemType === "pallet" && !targetSlot.isOccupied
+    ) {
+      setDropPreview({
+        xPct: targetSlot.xPos,
+        yPct: targetSlot.yPos,
+        widthCells: targetSlot.widthCells,
+        heightCells: targetSlot.heightCells,
+        isValid: true,
+      });
+      return;
+    }
+
+    const isZoneMove = isAdminMode && !draggedSlot.parentId;
+    const isShelfPallet = !isAdminMode && draggedSlot.itemType === "pallet" && Boolean(draggedSlot.parentId);
+    if (!isZoneMove && !isShelfPallet) {
+      setDropPreview(null);
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const xPct = Math.max(0, Math.min(100, (e.clientX - rect.left) / rect.width * 100));
+    const yPct = Math.max(0, Math.min(100, (e.clientY - rect.top) / rect.height * 100));
+    const nearest = findNearestOpenPosition(
+      slots,
+      { width: rect.width, height: rect.height },
+      activeBay,
+      xPct,
+      yPct,
+      draggedSlot.id,
+      draggedSlot,
+    );
+    setDropPreview({
+      xPct: nearest?.xPos ?? xPct,
+      yPct: nearest?.yPos ?? yPct,
+      widthCells: draggedSlot.widthCells,
+      heightCells: draggedSlot.heightCells,
+      isValid: nearest !== null,
+    });
+  };
+
+  const handleCanvasDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setDropPreview(null);
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -230,7 +336,7 @@ export default function FloorCanvas({
     if (list) list.push(pallet);
     else storedByShelf.set(pallet.parentId, [pallet]);
   }
-  const matchesQuery = (pallet: PhysicalPallet) => matchesSearchQuery(pallet, query);
+  const matchesQuery = (pallet: PhysicalPallet) => pallet.projectId.toLowerCase().includes(query);
 
   return (
     <section ref={sectionRef} className={`${styles.fullscreenSection} lg:col-span-3 min-w-0`}>
@@ -254,22 +360,71 @@ export default function FloorCanvas({
             : "bg-gray-950 border-gray-800"
         }`}
       >
-        <div className={styles.viewportToolbar}>
-          {fullscreenError && <span className="text-xs text-rose-300" role="status">{fullscreenError}</span>}
+        <div className={styles.viewportToolbar} data-no-pan>
+          {fullscreenError && <span className={`${styles.toolbarStatus} text-xs text-rose-300`} role="status">{fullscreenError}</span>}
+          <div
+            className={`${styles.zoomControls} pointer-events-auto flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-1`}
+            role="group"
+            aria-label="Map zoom controls"
+            title="Use the buttons or scroll over these controls to change zoom"
+            onWheel={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.deltaY !== 0) changeZoom(zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+            }}
+          >
+            <button
+              type="button"
+              className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              onClick={() => changeZoom(zoomLevel - ZOOM_STEP)}
+              disabled={zoomLevel <= MIN_ZOOM}
+              aria-label="Zoom out"
+              title="Zoom out"
+            >
+              -
+            </button>
+            <span
+              className={styles.zoomReadout}
+              aria-label={`Zoom ${zoomLevel} percent. Scroll here to adjust zoom.`}
+              aria-live="polite"
+            >
+              {zoomLevel}%
+            </span>
+            <button
+              type="button"
+              className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              onClick={() => changeZoom(zoomLevel + ZOOM_STEP)}
+              disabled={zoomLevel >= MAX_ZOOM}
+              aria-label="Zoom in"
+              title="Zoom in"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded px-3 text-xs font-semibold text-gray-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              onClick={() => changeZoom(100)}
+              aria-label="Reset zoom to 100%"
+              title="Reset zoom"
+            >
+              Reset
+            </button>
+          </div>
           <button
             type="button"
-            className={`${styles.fullscreenButton} rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`}
+            className={`${styles.fullscreenButton} min-h-12 rounded-md border border-gray-700 bg-gray-800 px-4 text-sm font-semibold text-gray-200 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`}
             onClick={() => void toggleFullscreen()}
             aria-label={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
             aria-pressed={isFullscreen}
-            title={isFullscreen ? "Exit fullscreen" : "View fullscreen"}
+            title={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
           >
-            {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            {isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           </button>
         </div>
         <div
           ref={canvasRef}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={handleCanvasDragOver}
+          onDragLeave={handleCanvasDragLeave}
           onDrop={handleDrop}
           className={`${styles.mapCanvas} ${isAdminMode ? `${styles.blueprint} bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)]` : "bg-gray-950"}`}
           style={{
@@ -291,6 +446,19 @@ export default function FloorCanvas({
             />
           )}
 
+          {dropPreview && (
+            <div
+              aria-hidden="true"
+              className={`${styles.dropPreview} ${dropPreview.isValid ? styles.dropPreviewAvailable : styles.dropPreviewBlocked}`}
+              style={{
+                left: `${dropPreview.xPct}%`,
+                top: `${dropPreview.yPct}%`,
+                width: `${dropPreview.widthCells / gridSize.columns * 100}%`,
+                height: `${dropPreview.heightCells / gridSize.rows * 100}%`,
+              }}
+            />
+          )}
+
           {slots.map((slot) => (
             <PalletSlot
               key={slot.id}
@@ -303,6 +471,14 @@ export default function FloorCanvas({
               isExpanded={slot.id === expandedShelfId}
               onSelect={onSelect}
               onPalletDrop={onPalletDrop}
+              onItemDragStart={(dragged) => {
+                setDraggedSlot(dragged);
+                setDropPreview(null);
+              }}
+              onItemDragEnd={() => {
+                setDraggedSlot(null);
+                setDropPreview(null);
+              }}
             />
           ))}
 

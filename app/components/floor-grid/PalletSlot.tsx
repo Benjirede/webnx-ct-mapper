@@ -23,9 +23,14 @@ interface Props {
   isExpanded: boolean;
   onSelect: (slot: PhysicalPallet) => void;
   onPalletDrop: (sourceId: string, target: PhysicalPallet) => void;
+  onItemDragStart: (slot: PhysicalPallet) => void;
+  onItemDragEnd: () => void;
 }
 
-export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearch, scale, storedCount, isExpanded, onSelect, onPalletDrop }: Props) {
+export default function PalletSlot({
+  slot, isAdminMode, isSelected, matchesSearch, scale, storedCount, isExpanded,
+  onSelect, onPalletDrop, onItemDragStart, onItemDragEnd,
+}: Props) {
   const levelCount = getLevelCount(slot);
   const isContainer = levelCount > 0;
   const capacity = slot.widthCells * slot.heightCells * levelCount;
@@ -33,6 +38,25 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/source-id", slot.id);
     e.dataTransfer.setData("text/drag-type", isAdminMode ? "move-zone" : "move-payload");
+    onItemDragStart(slot);
+
+    const button = e.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const dragImage = button.cloneNode(true) as HTMLButtonElement;
+    dragImage.style.position = "fixed";
+    dragImage.style.left = `${rect.left}px`;
+    dragImage.style.top = `${rect.top}px`;
+    dragImage.style.zIndex = "-1";
+    dragImage.style.pointerEvents = "none";
+    dragImage.style.transform = `scale(${scale})`;
+    dragImage.style.transformOrigin = "top left";
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(
+      dragImage,
+      (e.clientX - rect.left) * scale,
+      (e.clientY - rect.top) * scale,
+    );
+    window.setTimeout(() => dragImage.remove(), 0);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -51,9 +75,11 @@ export default function PalletSlot({ slot, isAdminMode, isSelected, matchesSearc
         top: `${slot.yPos}%`,
         ...(scale === 1 ? {} : { transform: `translate(-50%, -50%) scale(${scale})` }),
       }}
+      data-floor-slot-id={slot.id}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
-      className={`${styles.positioner} ${matchesSearch ? styles.searchMatchPositioner : ""}`}
+      onDragEnd={onItemDragEnd}
+      className={styles.positioner}
     >
       <button
         type="button"
