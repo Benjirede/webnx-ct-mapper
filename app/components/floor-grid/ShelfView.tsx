@@ -249,7 +249,10 @@ export default function ShelfView({
                     className={`flex h-full w-full flex-col justify-between rounded border border-amber-500 bg-amber-950/80 px-1.5 py-1 text-left text-amber-200 shadow-lg transition-all ${
                       "cursor-grab active:cursor-grabbing"
                     } ${selectedId === pallet.id ? "ring-2 ring-emerald-400" : ""} ${
-                      query !== "" && pallet.projectId.toLowerCase().includes(query)
+                      query !== "" && (
+                        pallet.id.toLowerCase().includes(query) ||
+                        pallet.projectId.toLowerCase().includes(query)
+                      )
                         ? "ring-4 ring-cyan-400 animate-bounce"
                         : ""
                     }`}
