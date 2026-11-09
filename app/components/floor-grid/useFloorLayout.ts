@@ -59,7 +59,6 @@ export function useFloorLayout() {
 
   const toggleAdminMode = () => {
     setIsAdminMode((prev) => !prev);
-    setSelectedSlot(null);
     setPendingFootprint(null);
     setIsPlacingItem(false);
     setExpandedShelfId(null);
