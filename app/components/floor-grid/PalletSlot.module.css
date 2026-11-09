@@ -16,7 +16,13 @@
   border-radius: 0.375rem;
   padding: 0.5rem;
   text-align: left;
-  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .searchMatchPositioner {
@@ -54,6 +60,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .slotButton {
+    transition-duration: 0.01ms;
+  }
+
   .searchMatch {
     animation: none;
     box-shadow: 0 0 0 1px rgb(20 184 166 / 0.2), 0 0 8px rgb(45 212 191 / 0.25);

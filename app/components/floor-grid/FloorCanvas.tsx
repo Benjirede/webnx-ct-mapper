@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { PhysicalPallet, type GridFootprint } from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
@@ -6,6 +6,7 @@ import ShelfView from "./ShelfView";
 import { CELL_HEIGHT, CELL_WIDTH, findNearestOpenPosition, getBayGridSize, type CanvasSize } from "./layoutPositions";
 import type { BayId } from "./types";
 import styles from "./FloorCanvas.module.css";
+import { BsLayoutSidebarReverse } from "react-icons/bs";
 
 const MIN_ZOOM = 50;
 const MAX_ZOOM = 200;
@@ -20,10 +21,15 @@ interface DropPreview {
 }
 
 interface Props {
+  fullscreenTargetRef: RefObject<HTMLDivElement | null>;
   slots: PhysicalPallet[];
   selectedSlot: PhysicalPallet | null;
   isAdminMode: boolean;
+  onToggleAdmin: () => void;
   searchQuery: string;
+  onSearchChange: (value: string) => void;
+  isInspectorOpen: boolean;
+  onToggleInspector: () => void;
   activeBay: BayId;
   onBayChange: (bay: BayId) => void;
   onSelect: (slot: PhysicalPallet) => void;
@@ -44,13 +50,14 @@ interface Props {
 }
 
 export default function FloorCanvas({
-  slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onClearSelection, onPalletDrop, onZoneMove, onCanvasSizeChange,
+  fullscreenTargetRef, slots, selectedSlot, isAdminMode, onToggleAdmin, searchQuery, onSearchChange,
+  isInspectorOpen, onToggleInspector, activeBay, onBayChange, onSelect, onClearSelection, onPalletDrop, onZoneMove, onCanvasSizeChange,
   isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
   shelfContents, expandedShelfId, onCloseShelf, onShelfDrop, onShelfPalletDrop,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const sectionRef = useRef<HTMLElement>(null);
+  const zoomControlsRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   const suppressBackgroundClickRef = useRef(false);
   const placementStartRef = useRef<{ pointerId: number; column: number; row: number } | null>(null);
@@ -105,14 +112,13 @@ export default function FloorCanvas({
   }, [activeBay, slots.length]);
 
   useEffect(() => {
-    const section = sectionRef.current;
     const syncFullscreenState = () => {
-      setIsFullscreen(document.fullscreenElement === section);
+      setIsFullscreen(document.fullscreenElement === fullscreenTargetRef.current);
       if (viewportRef.current) setViewportWidth(viewportRef.current.clientWidth);
     };
     document.addEventListener("fullscreenchange", syncFullscreenState);
     return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
-  }, []);
+  }, [fullscreenTargetRef]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -136,16 +142,16 @@ export default function FloorCanvas({
   }, [onCanvasSizeChange]);
 
   const toggleFullscreen = async () => {
-    const section = sectionRef.current;
-    if (!section) return;
+    const target = fullscreenTargetRef.current;
+    if (!target) return;
 
     try {
-      if (document.fullscreenElement === section) {
+      if (document.fullscreenElement === target) {
         await document.exitFullscreen();
       } else {
-        await section.requestFullscreen();
+        await target.requestFullscreen();
       }
-      setIsFullscreen(document.fullscreenElement === section);
+      setIsFullscreen(document.fullscreenElement === target);
       if (viewportRef.current) setViewportWidth(viewportRef.current.clientWidth);
       setFullscreenError("");
     } catch {
@@ -169,6 +175,21 @@ export default function FloorCanvas({
     }
     setZoomLevel(nextLevel);
   };
+
+  const handleZoomWheel = useEffectEvent((event: WheelEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.deltaY !== 0) changeZoom(zoomLevel + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+  });
+
+  useEffect(() => {
+    const zoomControls = zoomControlsRef.current;
+    if (!zoomControls) return;
+
+    const handleWheel = (event: WheelEvent) => handleZoomWheel(event);
+    zoomControls.addEventListener("wheel", handleWheel, { passive: false });
+    return () => zoomControls.removeEventListener("wheel", handleWheel);
+  }, []);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -356,72 +377,108 @@ export default function FloorCanvas({
   const matchesQuery = (pallet: PhysicalPallet) => pallet.projectId.toLowerCase().includes(query);
 
   return (
-    <section ref={sectionRef} className={`${styles.fullscreenSection} lg:col-span-3 min-w-0`}>
+    <section className={`${styles.fullscreenSection} ${isFullscreen ? styles.fullscreenCanvas : ""} min-w-0`}>
       <FloorNav activeBay={activeBay} onBayChange={onBayChange} />
       <div className="mb-2 flex justify-end">
         <span className="font-mono text-xs text-gray-500">{gridSize.columns} columns x {gridSize.rows} rows</span>
       </div>
-      <div className={styles.viewportToolbar} data-no-pan>
-        {fullscreenError && <span className={`${styles.toolbarStatus} text-xs text-rose-300`} role="status">{fullscreenError}</span>}
-        <div
-          className={`${styles.zoomControls} pointer-events-auto flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-1`}
-          role="group"
-          aria-label="Map zoom controls"
-          title="Use the buttons or scroll over these controls to change zoom"
-          onWheel={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.deltaY !== 0) changeZoom(zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
-          }}
-        >
-          <button
-            type="button"
-            className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-            onClick={() => changeZoom(zoomLevel - ZOOM_STEP)}
-            disabled={zoomLevel <= MIN_ZOOM}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
-            -
-          </button>
-          <span
-            className={styles.zoomReadout}
-            aria-label={`Zoom ${zoomLevel} percent. Scroll here to adjust zoom.`}
-            aria-live="polite"
-          >
-            {zoomLevel}%
-          </span>
-          <button
-            type="button"
-            className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-            onClick={() => changeZoom(zoomLevel + ZOOM_STEP)}
-            disabled={zoomLevel >= MAX_ZOOM}
-            aria-label="Zoom in"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="min-h-11 rounded px-3 text-xs font-semibold text-gray-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-            onClick={() => changeZoom(100)}
-            aria-label="Reset zoom to 100%"
-            title="Reset zoom"
-          >
-            Reset
-          </button>
+      <div className={styles.viewportToolbar} role="toolbar" aria-label="Floor map controls" data-no-pan>
+        <label className={styles.toolbarSearchGroup}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="10.8" cy="10.8" r="6.3" />
+            <path d="m15.5 15.5 4 4" />
+          </svg>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search ID, project, name, notes..."
+            aria-label="Search by item ID, project, name, or notes"
+            className={styles.toolbarSearch}
+          />
+        </label>
+        <div className={styles.toolbarActions}>
+          <div className={styles.toolbarGroup}>
+            <button
+              type="button"
+              onClick={onToggleAdmin}
+              className={`${styles.toolbarButton} ${isAdminMode ? styles.activeToolbarButton : ""}`}
+            >
+              {isAdminMode ? "Exit edit" : "Edit layout"}
+            </button>
+          </div>
+          <div className={styles.toolbarGroup}>
+            <div
+              ref={zoomControlsRef}
+              className={`${styles.zoomControls} pointer-events-auto flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-1`}
+              role="group"
+              aria-label="Map zoom controls"
+              title="Use the buttons or scroll over these controls to change zoom"
+            >
+              <button
+                type="button"
+                className="min-h-10 min-w-10 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                onClick={() => changeZoom(zoomLevel - ZOOM_STEP)}
+                disabled={zoomLevel <= MIN_ZOOM}
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                -
+              </button>
+              <span
+                className={styles.zoomReadout}
+                aria-label={`Zoom ${zoomLevel} percent. Scroll here to adjust zoom.`}
+                aria-live="polite"
+              >
+                {zoomLevel}%
+              </span>
+              <button
+                type="button"
+                className="min-h-10 min-w-10 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                onClick={() => changeZoom(zoomLevel + ZOOM_STEP)}
+                disabled={zoomLevel >= MAX_ZOOM}
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded px-2.5 text-xs font-semibold text-gray-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                onClick={() => changeZoom(100)}
+                aria-label="Reset zoom to 100%"
+                title="Reset zoom"
+              >
+                Reset
+              </button>
+            </div>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              onClick={() => void toggleFullscreen()}
+              aria-label={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
+              aria-pressed={isFullscreen}
+              title={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
+            >
+              {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            </button>
+          </div>
+          <div className={styles.toolbarGroup}>
+            <button
+  type="button"
+  className={`${styles.panelToggle} ${isInspectorOpen ? styles.activePanelToggle : ""}`}
+  onClick={onToggleInspector}
+  aria-expanded={isInspectorOpen}
+  aria-controls="floor-inspector"
+  aria-label="Inspector panel"
+  title={`${isInspectorOpen ? "Hide" : "Show"} inspector (I)`}
+>
+  <BsLayoutSidebarReverse aria-hidden="true" focusable="false" />
+</button>
+          </div>
         </div>
-        <button
-          type="button"
-          className={`${styles.fullscreenButton} min-h-12 rounded-md border border-gray-700 bg-gray-800 px-4 text-sm font-semibold text-gray-200 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`}
-          onClick={() => void toggleFullscreen()}
-          aria-label={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
-          aria-pressed={isFullscreen}
-          title={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
-        >
-          {isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        </button>
       </div>
+      {fullscreenError && <span className={`${styles.toolbarStatus} mb-2 text-xs text-rose-300`} role="status">{fullscreenError}</span>}
       <div
         ref={viewportRef}
         role="region"
@@ -444,11 +501,11 @@ export default function FloorCanvas({
           onDragOver={handleCanvasDragOver}
           onDragLeave={handleCanvasDragLeave}
           onDrop={handleDrop}
-          className={`${styles.mapCanvas} ${isAdminMode ? `${styles.blueprint} bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)]` : "bg-gray-950"}`}
+          className={`${styles.mapCanvas} ${isAdminMode ? styles.blueprint : ""}`}
           style={{
             width: gridSize.columns * cellWidth,
             height: gridSize.rows * cellHeight,
-            ...(isAdminMode ? { backgroundSize: `${cellWidth}px ${cellHeight}px` } : {}),
+            backgroundSize: `${cellWidth}px ${cellHeight}px`,
           }}
         >
           {pendingFootprint && (
