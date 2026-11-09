@@ -1,4 +1,5 @@
-import { useState, type ComponentProps } from "react";
+import { useState, type ComponentProps, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import {
   FLOOR_ITEM_LABELS,
   FLOOR_ITEM_TYPES,
@@ -15,6 +16,7 @@ import InspectorPanel from "./InspectorPanel";
 type InspectorProps = ComponentProps<typeof InspectorPanel>;
 
 interface Props {
+  fullscreenTargetRef: RefObject<HTMLDivElement | null>;
   selectedSlot: PhysicalPallet | null;
   selectedStoredCount: number;
   isPlacingItem: boolean;
@@ -30,16 +32,18 @@ interface Props {
 }
 
 export default function AdminPanel({
-  selectedSlot, selectedStoredCount, isPlacingItem, pendingFootprint, placementAvailable,
+  fullscreenTargetRef, selectedSlot, selectedStoredCount, isPlacingItem, pendingFootprint, placementAvailable,
   onStartPlacement, onCancelPlacement, onCreate, onSave, onRename, onDelete,
 }: Props) {
   const [newSlotId, setNewSlotId] = useState("");
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
   const [levels, setLevels] = useState<number>(DEFAULT_LEVEL);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const itemHasLevels = hasLevels(itemType);
 
-  const handleCreate = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleCreate = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (
       !pendingFootprint ||
@@ -47,15 +51,69 @@ export default function AdminPanel({
       !newSlotId.trim() ||
       newSlotId.trim().length > MAX_ITEM_ID_LENGTH
     ) return;
-    const levelsText = itemHasLevels ? `, ${levels} ${levels === 1 ? "level" : "levels"}` : "";
-    const confirmation = `Create ${newSlotId.trim()} as ${FLOOR_ITEM_LABELS[itemType]} (${pendingFootprint.widthCells} x ${pendingFootprint.heightCells} cells${levelsText}) in this bay?`;
-    if (!window.confirm(confirmation)) return;
-    if (await onCreate(newSlotId, itemType, pendingFootprint, itemHasLevels ? levels : undefined)) {
-      setNewSlotId("");
-      setItemType("pallet");
-      setLevels(DEFAULT_LEVEL);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmCreate = async () => {
+    if (!pendingFootprint || !placementAvailable || isCreating) return;
+    setIsCreating(true);
+    try {
+      if (await onCreate(newSlotId, itemType, pendingFootprint, itemHasLevels ? levels : undefined)) {
+        setIsConfirmOpen(false);
+        setNewSlotId("");
+        setItemType("pallet");
+        setLevels(DEFAULT_LEVEL);
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
+
+  const confirmationDialog = isConfirmOpen && fullscreenTargetRef.current && pendingFootprint
+    ? createPortal(
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+        onClick={(event) => {
+          if (event.target === event.currentTarget && !isCreating) setIsConfirmOpen(false);
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-item-confirm-title"
+          className="w-full max-w-md space-y-5 rounded-xl border border-gray-700 bg-gray-900 p-6 text-white shadow-2xl"
+        >
+          <div>
+            <h2 id="create-item-confirm-title" className="text-lg font-semibold">Create this floor item?</h2>
+            <p className="mt-2 text-sm text-gray-300">
+              Create <span className="font-semibold text-amber-200">{newSlotId.trim()}</span> as{" "}
+              {FLOOR_ITEM_LABELS[itemType]} ({pendingFootprint.widthCells} x {pendingFootprint.heightCells} cells
+              {itemHasLevels ? `, ${levels} ${levels === 1 ? "level" : "levels"}` : ""}) in this bay?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsConfirmOpen(false)}
+              disabled={isCreating}
+              className="rounded-md border border-gray-600 px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmCreate()}
+              disabled={isCreating}
+              className="rounded-md bg-amber-400 px-4 py-2 text-sm font-semibold text-gray-950 transition-colors hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isCreating ? "Creating…" : "Create item"}
+            </button>
+          </div>
+        </div>
+      </div>,
+      fullscreenTargetRef.current,
+    )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -172,6 +230,8 @@ export default function AdminPanel({
           )}
         </form>
       </section>
+
+      {confirmationDialog}
 
       {selectedSlot && (
         <section aria-label="Selected item" className="space-y-4 border-t border-gray-700 pt-5">

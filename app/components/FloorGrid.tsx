@@ -66,6 +66,7 @@ export default function FloorGrid() {
             {isAdminMode ? (
               <AdminPanel
                 key={selectedSlot?.id ?? "none"}
+                fullscreenTargetRef={workspaceRef}
                 selectedSlot={selectedSlot}
                 selectedStoredCount={selectedSlot ? layout.storedCountFor(selectedSlot.id) : 0}
                 onCreate={layout.createZone}

@@ -336,7 +336,10 @@ export default function FloorCanvas({
 
     const target = e.target as HTMLElement;
     if (target.closest("[data-floor-slot-id], [data-no-pan], button, input, select, textarea, a")) return;
-    if (!isPlacingItem) onClearSelection();
+    if (!isPlacingItem) {
+      onClearSelection();
+      onFootprintChange(null);
+    }
   };
 
   const finishPan = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -349,6 +352,7 @@ export default function FloorCanvas({
     if (placementStartRef.current?.pointerId === e.pointerId) {
       handlePointerMove(e);
       placementStartRef.current = null;
+      suppressBackgroundClickRef.current = true;
       onFinishPlacement();
       return;
     }
