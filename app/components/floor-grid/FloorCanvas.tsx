@@ -27,6 +27,7 @@ interface Props {
   activeBay: BayId;
   onBayChange: (bay: BayId) => void;
   onSelect: (slot: PhysicalPallet) => void;
+  onClearSelection: () => void;
   onPalletDrop: (sourceId: string, target: PhysicalPallet) => void;
   onZoneMove: (sourceId: string, xPct: number, yPct: number) => void;
   onCanvasSizeChange: (size: CanvasSize) => void;
@@ -43,7 +44,7 @@ interface Props {
 }
 
 export default function FloorCanvas({
-  slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onPalletDrop, onZoneMove, onCanvasSizeChange,
+  slots, selectedSlot, isAdminMode, searchQuery, activeBay, onBayChange, onSelect, onClearSelection, onPalletDrop, onZoneMove, onCanvasSizeChange,
   isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
   shelfContents, expandedShelfId, onCloseShelf, onShelfDrop, onShelfPalletDrop,
 }: Props) {
@@ -51,6 +52,7 @@ export default function FloorCanvas({
   const canvasRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const panStartRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const suppressBackgroundClickRef = useRef(false);
   const placementStartRef = useRef<{ pointerId: number; column: number; row: number } | null>(null);
   const zoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -246,6 +248,7 @@ export default function FloorCanvas({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    suppressBackgroundClickRef.current = false;
     if (e.button !== 0 || (e.target as HTMLElement).closest("button, [data-no-pan]")) return;
 
     const viewport = e.currentTarget;
@@ -297,8 +300,22 @@ export default function FloorCanvas({
     const panStart = panStartRef.current;
     if (!panStart || panStart.pointerId !== e.pointerId) return;
 
+    if (Math.abs(e.clientX - panStart.x) > 4 || Math.abs(e.clientY - panStart.y) > 4) {
+      suppressBackgroundClickRef.current = true;
+    }
     e.currentTarget.scrollLeft = panStart.scrollLeft - (e.clientX - panStart.x);
     e.currentTarget.scrollTop = panStart.scrollTop - (e.clientY - panStart.y);
+  };
+
+  const handleViewportClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (suppressBackgroundClickRef.current) {
+      suppressBackgroundClickRef.current = false;
+      return;
+    }
+
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-floor-slot-id], [data-no-pan], button, input, select, textarea, a")) return;
+    if (!isPlacingItem) onClearSelection();
   };
 
   const finishPan = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -344,6 +361,67 @@ export default function FloorCanvas({
       <div className="mb-2 flex justify-end">
         <span className="font-mono text-xs text-gray-500">{gridSize.columns} columns x {gridSize.rows} rows</span>
       </div>
+      <div className={styles.viewportToolbar} data-no-pan>
+        {fullscreenError && <span className={`${styles.toolbarStatus} text-xs text-rose-300`} role="status">{fullscreenError}</span>}
+        <div
+          className={`${styles.zoomControls} pointer-events-auto flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-1`}
+          role="group"
+          aria-label="Map zoom controls"
+          title="Use the buttons or scroll over these controls to change zoom"
+          onWheel={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.deltaY !== 0) changeZoom(zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+          }}
+        >
+          <button
+            type="button"
+            className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            onClick={() => changeZoom(zoomLevel - ZOOM_STEP)}
+            disabled={zoomLevel <= MIN_ZOOM}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            -
+          </button>
+          <span
+            className={styles.zoomReadout}
+            aria-label={`Zoom ${zoomLevel} percent. Scroll here to adjust zoom.`}
+            aria-live="polite"
+          >
+            {zoomLevel}%
+          </span>
+          <button
+            type="button"
+            className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            onClick={() => changeZoom(zoomLevel + ZOOM_STEP)}
+            disabled={zoomLevel >= MAX_ZOOM}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="min-h-11 rounded px-3 text-xs font-semibold text-gray-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            onClick={() => changeZoom(100)}
+            aria-label="Reset zoom to 100%"
+            title="Reset zoom"
+          >
+            Reset
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`${styles.fullscreenButton} min-h-12 rounded-md border border-gray-700 bg-gray-800 px-4 text-sm font-semibold text-gray-200 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`}
+          onClick={() => void toggleFullscreen()}
+          aria-label={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
+          aria-pressed={isFullscreen}
+          title={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
+        >
+          {isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        </button>
+      </div>
       <div
         ref={viewportRef}
         role="region"
@@ -354,73 +432,13 @@ export default function FloorCanvas({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onLostPointerCapture={handlePointerCancel}
+        onClick={handleViewportClick}
         className={`${styles.viewport} ${isPlacingItem ? styles.placementMode : ""} w-full overflow-auto overscroll-contain rounded-xl border shadow-inner ${
           isAdminMode
           ? "bg-gray-950 border-amber-500/50"
             : "bg-gray-950 border-gray-800"
         }`}
       >
-        <div className={styles.viewportToolbar} data-no-pan>
-          {fullscreenError && <span className={`${styles.toolbarStatus} text-xs text-rose-300`} role="status">{fullscreenError}</span>}
-          <div
-            className={`${styles.zoomControls} pointer-events-auto flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-1`}
-            role="group"
-            aria-label="Map zoom controls"
-            title="Use the buttons or scroll over these controls to change zoom"
-            onWheel={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.deltaY !== 0) changeZoom(zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
-            }}
-          >
-            <button
-              type="button"
-              className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-              onClick={() => changeZoom(zoomLevel - ZOOM_STEP)}
-              disabled={zoomLevel <= MIN_ZOOM}
-              aria-label="Zoom out"
-              title="Zoom out"
-            >
-              -
-            </button>
-            <span
-              className={styles.zoomReadout}
-              aria-label={`Zoom ${zoomLevel} percent. Scroll here to adjust zoom.`}
-              aria-live="polite"
-            >
-              {zoomLevel}%
-            </span>
-            <button
-              type="button"
-              className="min-h-11 min-w-11 rounded text-lg font-semibold leading-none text-gray-200 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-              onClick={() => changeZoom(zoomLevel + ZOOM_STEP)}
-              disabled={zoomLevel >= MAX_ZOOM}
-              aria-label="Zoom in"
-              title="Zoom in"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="min-h-11 rounded px-3 text-xs font-semibold text-gray-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-              onClick={() => changeZoom(100)}
-              aria-label="Reset zoom to 100%"
-              title="Reset zoom"
-            >
-              Reset
-            </button>
-          </div>
-          <button
-            type="button"
-            className={`${styles.fullscreenButton} min-h-12 rounded-md border border-gray-700 bg-gray-800 px-4 text-sm font-semibold text-gray-200 hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`}
-            onClick={() => void toggleFullscreen()}
-            aria-label={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
-            aria-pressed={isFullscreen}
-            title={isFullscreen ? "Exit fullscreen floor plan" : "View fullscreen floor plan"}
-          >
-            {isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          </button>
-        </div>
         <div
           ref={canvasRef}
           onDragOver={handleCanvasDragOver}

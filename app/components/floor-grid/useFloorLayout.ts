@@ -73,6 +73,8 @@ export function useFloorLayout() {
     }
   };
 
+  const clearSelection = () => setSelectedSlot(null);
+
   const closeShelf = () => setExpandedShelfId(null);
 
   const deleteZone = async (itemId: string): Promise<{ ok: boolean; error?: string }> => {
@@ -403,6 +405,7 @@ export function useFloorLayout() {
     },
     finishItemPlacement: () => setIsPlacingItem(false),
     selectSlot,
+    clearSelection,
     closeShelf,
     selectBay,
     toggleAdminMode,

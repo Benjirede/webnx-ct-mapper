@@ -28,6 +28,7 @@ export default function FloorGrid() {
           activeBay={layout.activeBay}
           onBayChange={layout.selectBay}
           onSelect={layout.selectSlot}
+          onClearSelection={layout.clearSelection}
           onPalletDrop={layout.movePallet}
           onZoneMove={layout.moveZone}
           onCanvasSizeChange={layout.setCanvasSize}
