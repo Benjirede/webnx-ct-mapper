@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { PhysicalPallet, type GridFootprint } from "./types";
+import { matchesSearchQuery, PhysicalPallet, type GridFootprint } from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
 import ShelfView from "./ShelfView";
@@ -378,7 +378,7 @@ export default function FloorCanvas({
     if (list) list.push(pallet);
     else storedByShelf.set(pallet.parentId, [pallet]);
   }
-  const matchesQuery = (pallet: PhysicalPallet) => pallet.projectId.toLowerCase().includes(query);
+  const matchesQuery = (pallet: PhysicalPallet) => matchesSearchQuery(pallet, query);
 
   return (
     <section className={`${styles.fullscreenSection} ${isFullscreen ? styles.fullscreenCanvas : ""} min-w-0`}>

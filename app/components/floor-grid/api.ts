@@ -8,14 +8,25 @@ export async function fetchLayout(): Promise<PhysicalPallet[] | null> {
   return data.error ? null : data;
 }
 
-export async function postSlot(payload: object): Promise<{ ok: boolean; error?: string; version?: number }> {
+export async function postSlot(payload: object): Promise<{
+  ok: boolean;
+  error?: string;
+  version?: number;
+  sourceVersion?: number;
+  targetVersion?: number;
+}> {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  const data = await res.json().catch(() => null) as { error?: unknown; version?: unknown } | null;
+  const data = await res.json().catch(() => null) as {
+    error?: unknown;
+    version?: unknown;
+    sourceVersion?: unknown;
+    targetVersion?: unknown;
+  } | null;
   if (!res.ok) {
     return {
       ok: false,
@@ -26,6 +37,8 @@ export async function postSlot(payload: object): Promise<{ ok: boolean; error?: 
   return {
     ok: true,
     ...(typeof data?.version === "number" ? { version: data.version } : {}),
+    ...(typeof data?.sourceVersion === "number" ? { sourceVersion: data.sourceVersion } : {}),
+    ...(typeof data?.targetVersion === "number" ? { targetVersion: data.targetVersion } : {}),
   };
 }
 

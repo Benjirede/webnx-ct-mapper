@@ -156,7 +156,11 @@ export async function POST(request: Request) {
 
         })();
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({
+          success: true,
+          sourceVersion: (source.version ?? 0) + 1,
+          targetVersion: (target.version ?? 0) + 1,
+        });
       } catch (txError: any) {
         return NextResponse.json({ error: txError.message }, { status: 500 });
       }
@@ -291,6 +295,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Notes must be 4000 characters or fewer" }, { status: 400 });
     }
 
+    if (body.bayId !== undefined && !isBayId(body.bayId)) {
+      return NextResponse.json({ error: "Invalid bay" }, { status: 400 });
+    }
+
+    const updatedBayId = body.bayId ?? oldRow.bay_id;
+    const isMovingBay = updatedBayId !== oldRow.bay_id;
+    if (isMovingBay) {
+      if (oldRow.parent_id && body.parentId !== null) {
+        return NextResponse.json({ error: "A pallet must leave its shelf before changing bays" }, { status: 400 });
+      }
+      const bayGridSize = getBayGridSize(updatedBayId);
+      if (
+        oldRow.width_cells > bayGridSize.columns ||
+        oldRow.height_cells > bayGridSize.rows ||
+        !isPercent(body.xPos) || !isPercent(body.yPos)
+      ) {
+        return NextResponse.json({ error: "Item does not fit in the destination bay" }, { status: 400 });
+      }
+      const centerColumn = body.xPos / 100 * bayGridSize.columns;
+      const centerRow = body.yPos / 100 * bayGridSize.rows;
+      if (
+        centerColumn < oldRow.width_cells / 2 ||
+        centerColumn > bayGridSize.columns - oldRow.width_cells / 2 ||
+        centerRow < oldRow.height_cells / 2 ||
+        centerRow > bayGridSize.rows - oldRow.height_cells / 2
+      ) {
+        return NextResponse.json({ error: "Item position is outside the destination bay" }, { status: 400 });
+      }
+    }
+
     const updatedOccupied = typeof body.isOccupied === "boolean" ? (body.isOccupied ? 1 : 0) : oldRow.is_occupied;
     const updatedProjectId = typeof body.projectId === "string" ? body.projectId : oldRow.project_id;
     const updatedNotes = typeof body.notes === "string" ? body.notes : oldRow.notes;
@@ -355,10 +389,14 @@ export async function POST(request: Request) {
         yPos = body.yPos;
       }
 
-      db.prepare('UPDATE pallet_slots SET is_occupied = ?, project_id = ?, notes = ?, occupied_since = ?, x_pos = ?, y_pos = ?, parent_id = ?, level = ?, cell_column = ?, cell_row = ?, version = version + 1, updated_at = ? WHERE id = ?')
-        .run(updatedOccupied, updatedProjectId, updatedNotes, occupiedSinceTimestamp, xPos, yPos, parentId, shelfLevel, cellColumn, cellRow, systemTime, targetId);
+      db.prepare('UPDATE pallet_slots SET bay_id = ?, is_occupied = ?, project_id = ?, notes = ?, occupied_since = ?, x_pos = ?, y_pos = ?, parent_id = ?, level = ?, cell_column = ?, cell_row = ?, version = version + 1, updated_at = ? WHERE id = ?')
+        .run(updatedBayId, updatedOccupied, updatedProjectId, updatedNotes, occupiedSinceTimestamp, xPos, yPos, parentId, shelfLevel, cellColumn, cellRow, systemTime, targetId);
+      if (isMovingBay && !oldRow.parent_id) {
+        db.prepare('UPDATE pallet_slots SET bay_id = ?, version = version + 1, updated_at = ? WHERE parent_id = ?')
+          .run(updatedBayId, systemTime, targetId);
+      }
 
-      let computedAction = "UPDATED_DETAILS";
+      let computedAction = isMovingBay ? "MOVED_BETWEEN_BAYS" : "UPDATED_DETAILS";
       if (!oldRow.parent_id && parentId) computedAction = "STORED_ON_SHELF";
       else if (oldRow.parent_id && !parentId) computedAction = "REMOVED_FROM_SHELF";
       else if (oldRow.parent_id && parentId && (oldRow.parent_id !== parentId || oldRow.level !== shelfLevel || oldRow.cell_column !== cellColumn || oldRow.cell_row !== cellRow)) computedAction = "MOVED_ON_SHELF";
@@ -369,8 +407,8 @@ export async function POST(request: Request) {
         .run(
           targetId,
           computedAction,
-          JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1, shelf: oldRow.parent_id ?? null }),
-          JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1, shelf: parentId }),
+          JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1, shelf: oldRow.parent_id ?? null, bayId: oldRow.bay_id }),
+          JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1, shelf: parentId, bayId: updatedBayId }),
           systemTime
         );
 

@@ -206,7 +206,7 @@ export function useFloorLayout() {
   /** xPct / yPct are raw canvas percentages; placement snaps to the nearest open cell. */
   const moveZone = async (sourceId: string, xPct: number, yPct: number) => {
     const target = slots.find((s) => s.id === sourceId);
-    if (!target || target.bayId !== activeBay || target.parentId) return;
+    if (!target || target.parentId) return;
 
     const position = findNearestOpenPosition(activeSlots, canvasSize, activeBay, xPct, yPct, sourceId, target);
     if (!position) {
@@ -214,14 +214,29 @@ export function useFloorLayout() {
       return;
     }
 
-    const updated = { ...target, ...position };
-    setSlots((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
-    if (selectedSlot?.id === sourceId) setSelectedSlot(updated);
-    const result = await postSlot(updated);
-    if (result.ok && result.version !== undefined) {
-      const saved = { ...updated, version: result.version };
-      setSlots((prev) => prev.map((slot) => (slot.id === sourceId ? saved : slot)));
+    const updated = { ...target, bayId: activeBay, ...position };
+    try {
+      const result = await postSlot(updated);
+      if (!result.ok) {
+        alert(`Unable to move item: ${result.error}`);
+        return;
+      }
+
+      const saved = result.version === undefined ? updated : { ...updated, version: result.version };
+      setSlots((prev) => prev.map((slot) => {
+        if (slot.id === sourceId) return saved;
+        if (target.bayId !== activeBay && slot.parentId === sourceId) {
+          return {
+            ...slot,
+            bayId: activeBay,
+            ...(slot.version === undefined ? {} : { version: slot.version + 1 }),
+          };
+        }
+        return slot;
+      }));
       setSelectedSlot((prev) => prev?.id === sourceId ? saved : prev);
+    } catch (error) {
+      alert(`Unable to move item: ${error instanceof Error ? error.message : "Network error"}`);
     }
   };
 
@@ -237,7 +252,7 @@ export function useFloorLayout() {
     const sourceSlot = slots.find((s) => s.id === sourceId);
     if (
       !sourceSlot || sourceSlot.itemType !== "pallet" || !sourceSlot.isOccupied ||
-      sourceSlot.bayId !== activeBay || targetSlot.bayId !== activeBay
+      targetSlot.bayId !== activeBay
     ) return;
 
     const newTarget = {
@@ -271,18 +286,39 @@ export function useFloorLayout() {
       return;
     }
 
-    const newSource = { ...sourceSlot, isOccupied: false, projectId: "", notes: "" };
+    try {
+      const result = await postSlot({
+        action: "move_pallet",
+        sourceId: sourceSlot.id,
+        targetId: targetSlot.id,
+      });
+      if (!result.ok) {
+        alert(`Unable to move pallet: ${result.error}`);
+        return;
+      }
 
-    setSlots((prev) =>
-      prev.map((s) => (s.id === targetSlot.id ? newTarget : s.id === sourceSlot.id ? newSource : s))
-    );
-    if (selectedSlot?.id === sourceSlot.id) setSelectedSlot(newSource);
-    if (selectedSlot?.id === targetSlot.id) setSelectedSlot(newTarget);
-
-    const targetResult = await postSlot(newTarget);
-    const sourceResult = await postSlot(newSource);
-    applySavedVersion(targetSlot.id, targetResult.version);
-    applySavedVersion(sourceSlot.id, sourceResult.version);
+      const newSource = {
+        ...sourceSlot,
+        isOccupied: false,
+        projectId: "",
+        notes: "",
+        ...(result.sourceVersion === undefined ? {} : { version: result.sourceVersion }),
+      };
+      const savedTarget = {
+        ...newTarget,
+        ...(result.targetVersion === undefined ? {} : { version: result.targetVersion }),
+      };
+      setSlots((prev) =>
+        prev.map((s) => s.id === targetSlot.id ? savedTarget : s.id === sourceSlot.id ? newSource : s)
+      );
+      setSelectedSlot((prev) => {
+        if (prev?.id === sourceSlot.id) return newSource;
+        if (prev?.id === targetSlot.id) return savedTarget;
+        return prev;
+      });
+    } catch (error) {
+      alert(`Unable to move pallet: ${error instanceof Error ? error.message : "Network error"}`);
+    }
   };
 
   /**
@@ -340,7 +376,7 @@ export function useFloorLayout() {
   /** Drop a shelved pallet on open floor: it leaves the shelf and snaps to the nearest open floor cell. */
   const takeOffShelf = async (sourceId: string, xPct: number, yPct: number) => {
     const source = slots.find((s) => s.id === sourceId);
-    if (!source || !source.parentId || source.bayId !== activeBay) return;
+    if (!source || !source.parentId) return;
 
     const position = findNearestOpenPosition(activeSlots, canvasSize, activeBay, xPct, yPct, source.id, source);
     if (!position) {
@@ -350,6 +386,7 @@ export function useFloorLayout() {
 
     const updated: PhysicalPallet = {
       ...source,
+      bayId: activeBay,
       ...position,
       parentId: undefined,
       level: undefined,
