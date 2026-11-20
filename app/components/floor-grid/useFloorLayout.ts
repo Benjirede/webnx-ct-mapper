@@ -8,6 +8,7 @@ import {
   type BayId,
   type FloorItemType,
   type GridFootprint,
+  matchesSearchQuery,
 } from "./types";
 import { deleteSlot, fetchLayout, postSlot } from "./api";
 import { findNearestOpenPosition, getPositionForFootprint, type CanvasSize } from "./layoutPositions";
@@ -29,6 +30,14 @@ export function useFloorLayout() {
   const activeSlots = bayItems.filter((slot) => !slot.parentId);
   // Pallets stored on shelves in the active bay.
   const shelfContents = bayItems.filter((slot) => slot.parentId);
+  const searchMatchBayIds = searchQuery.trim()
+    ? Array.from(new Set(
+        slots
+          .filter((slot) => matchesSearchQuery(slot, searchQuery))
+          .map((slot) => slot.bayId)
+          .filter((bayId) => bayId !== activeBay)
+      ))
+    : [];
   const placementAvailable = pendingFootprint
     ? Boolean(getPositionForFootprint(activeSlots, activeBay, pendingFootprint))
     : false;
@@ -423,6 +432,7 @@ export function useFloorLayout() {
     activeBay,
     activeSlots,
     shelfContents,
+    searchMatchBayIds,
     expandedShelfId,
     searchQuery,
     isPlacingItem,

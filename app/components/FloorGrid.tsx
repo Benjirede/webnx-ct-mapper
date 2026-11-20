@@ -35,6 +35,7 @@ export default function FloorGrid() {
             onToggleAdmin={layout.toggleAdminMode}
             searchQuery={layout.searchQuery}
             onSearchChange={layout.setSearchQuery}
+            searchMatchBayIds={layout.searchMatchBayIds}
             isInspectorOpen={isInspectorOpen}
             onToggleInspector={() => setIsInspectorOpen((open) => !open)}
             activeBay={layout.activeBay}

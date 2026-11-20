@@ -28,6 +28,7 @@ interface Props {
   onToggleAdmin: () => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  searchMatchBayIds: BayId[];
   isInspectorOpen: boolean;
   onToggleInspector: () => void;
   activeBay: BayId;
@@ -51,6 +52,7 @@ interface Props {
 
 export default function FloorCanvas({
   fullscreenTargetRef, slots, selectedSlot, isAdminMode, onToggleAdmin, searchQuery, onSearchChange,
+  searchMatchBayIds,
   isInspectorOpen, onToggleInspector, activeBay, onBayChange, onSelect, onClearSelection, onPalletDrop, onZoneMove, onCanvasSizeChange,
   isPlacingItem, pendingFootprint, placementAvailable, onFootprintChange, onFinishPlacement,
   shelfContents, expandedShelfId, onCloseShelf, onShelfDrop, onShelfPalletDrop,
@@ -382,7 +384,11 @@ export default function FloorCanvas({
 
   return (
     <section className={`${styles.fullscreenSection} ${isFullscreen ? styles.fullscreenCanvas : ""} min-w-0`}>
-      <FloorNav activeBay={activeBay} onBayChange={onBayChange} />
+      <FloorNav
+        activeBay={activeBay}
+        onBayChange={onBayChange}
+        searchMatchBayIds={searchMatchBayIds}
+      />
       <div className="mb-2 flex justify-end">
         <span className="font-mono text-xs text-gray-500">{gridSize.columns} columns x {gridSize.rows} rows</span>
       </div>
