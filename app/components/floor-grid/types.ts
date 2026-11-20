@@ -26,6 +26,31 @@ export const FLOOR_ITEM_TYPES = [
 
 export type FloorItemType = (typeof FLOOR_ITEM_TYPES)[number];
 
+export const PALLET_STATUSES = [
+  "empty",
+  "in-progress",
+  "on-hold",
+  "direct-sale",
+  "dc-techs",
+  "inactive",
+] as const;
+
+export type PalletStatus = (typeof PALLET_STATUSES)[number];
+
+export const PALLET_STATUS_LABELS: Record<PalletStatus, string> = {
+  empty: "Empty",
+  "in-progress": "In Progress",
+  "on-hold": "On Hold",
+  "direct-sale": "Direct Sale/Ebay",
+  "dc-techs": "DC Techs",
+  inactive: "Inactive",
+};
+
+export function isPalletStatus(value: unknown): value is PalletStatus {
+  return typeof value === "string" &&
+    (PALLET_STATUSES as readonly string[]).includes(value);
+}
+
 export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
   pallet: "Pallet",
   "walking-lane": "Walking lane",
@@ -64,6 +89,7 @@ export interface PhysicalPallet {
   xPos: number;
   yPos: number;
   version?: number;
+  status?: PalletStatus;
   /** Shelf/rack only: number of levels (defaults to DEFAULT_LEVEL). */
   levels?: number;
   /** Stored pallets only: id of the shelf/rack holding this pallet. Stored pallets are not drawn on the floor. */

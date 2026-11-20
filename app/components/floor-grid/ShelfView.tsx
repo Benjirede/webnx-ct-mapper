@@ -3,6 +3,28 @@ import { CELL_HEIGHT, CELL_WIDTH } from "./layoutPositions";
 import { FLOOR_ITEM_LABELS, getLevelCount, matchesSearchQuery, type PhysicalPallet } from "./types";
 import slotStyles from "./PalletSlot.module.css";
 
+const palletStatusStyles: Record<NonNullable<PhysicalPallet["status"]>, string> = {
+  empty: "border-violet-500 bg-violet-950/80 text-violet-100",
+  "in-progress": "border-blue-500 bg-blue-950/80 text-blue-100",
+  "on-hold": "border-red-500 bg-red-950/80 text-red-100",
+  "direct-sale": "border-yellow-400 bg-yellow-950/80 text-yellow-100",
+  "dc-techs": "border-green-500 bg-green-950/80 text-green-100",
+  inactive: "border-gray-500 bg-gray-800 text-gray-200",
+};
+
+const palletStatusColors: Record<NonNullable<PhysicalPallet["status"]>, {
+  backgroundColor: string;
+  borderColor: string;
+  color: string;
+}> = {
+  empty: { backgroundColor: "#4c1d95", borderColor: "#8b5cf6", color: "#ede9fe" },
+  "in-progress": { backgroundColor: "#1e3a8a", borderColor: "#3b82f6", color: "#dbeafe" },
+  "on-hold": { backgroundColor: "#7f1d1d", borderColor: "#ef4444", color: "#fee2e2" },
+  "direct-sale": { backgroundColor: "#713f12", borderColor: "#facc15", color: "#fef9c3" },
+  "dc-techs": { backgroundColor: "#14532d", borderColor: "#22c55e", color: "#dcfce7" },
+  inactive: { backgroundColor: "#374151", borderColor: "#6b7280", color: "#e5e7eb" },
+};
+
 const PANEL_MIN_WIDTH = 248;
 const PANEL_PADDING = 12;
 const CHROME_HEIGHT = 176;
@@ -241,6 +263,7 @@ export default function ShelfView({
                   <button
                     type="button"
                     draggable
+                    style={palletStatusColors[pallet.status ?? "empty"]}
                     onClick={() => onSelect(pallet)}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/source-id", pallet.id);
@@ -249,7 +272,9 @@ export default function ShelfView({
                     title={pallet.notes || pallet.projectId}
                     className={`flex h-full w-full flex-col justify-between rounded border border-amber-500 bg-amber-950/80 px-1.5 py-1 text-left text-amber-200 shadow-lg transition-all ${
                       "cursor-grab active:cursor-grabbing"
-                    } ${selectedId === pallet.id ? "ring-2 ring-emerald-400" : ""} ${
+                    } ${palletStatusStyles[pallet.status ?? "empty"]} ${
+                      selectedId === pallet.id ? "ring-2 ring-emerald-400" : ""
+                    } ${
                       matchesSearchQuery(pallet, query)
                         ? "ring-4 ring-cyan-400 animate-bounce"
                         : ""

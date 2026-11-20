@@ -8,6 +8,7 @@ import {
   type BayId,
   type FloorItemType,
   type GridFootprint,
+  type PalletStatus,
   matchesSearchQuery,
 } from "./types";
 import { deleteSlot, fetchLayout, postSlot } from "./api";
@@ -106,12 +107,12 @@ export function useFloorLayout() {
     }
   };
 
-  const saveDetails = async (projectId: string, notes: string) => {
+  const saveDetails = async (projectId: string, notes: string, status: PalletStatus) => {
     if (!selectedSlot) return;
 
     // Clearing the project on a shelved pallet takes it off the shelf (it has no floor slot to go back to).
     if (selectedSlot.parentId && projectId.trim() === "") {
-      const emptied = await postSlot({ ...selectedSlot, isOccupied: false, projectId: "", notes });
+      const emptied = await postSlot({ ...selectedSlot, isOccupied: false, projectId: "", notes, status });
       if (!emptied.ok) {
         alert(`Unable to remove pallet from shelf: ${emptied.error}`);
         return;
@@ -126,6 +127,7 @@ export function useFloorLayout() {
       isOccupied: projectId.trim() !== "",
       projectId,
       notes,
+      status,
     };
     setSlots((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     setSelectedSlot(updated);
@@ -166,7 +168,8 @@ export function useFloorLayout() {
     newId: string,
     itemType: FloorItemType,
     footprint: GridFootprint,
-    levels?: number
+    levels?: number,
+    status: PalletStatus = "empty",
   ) => {
     if (!newId.trim()) return false;
     const finalId = newId.trim().toUpperCase();
@@ -186,6 +189,7 @@ export function useFloorLayout() {
       id: finalId,
       bayId: activeBay,
       itemType,
+      status: itemType === "pallet" ? status : undefined,
       widthCells: footprint.widthCells,
       heightCells: footprint.heightCells,
       isOccupied: false,
@@ -269,6 +273,7 @@ export function useFloorLayout() {
       isOccupied: true,
       projectId: sourceSlot.projectId,
       notes: sourceSlot.notes,
+      status: sourceSlot.status ?? "empty",
     };
 
     // Shelf -> vacant floor slot: the contents move to the floor slot and the shelf record is removed.
@@ -306,11 +311,12 @@ export function useFloorLayout() {
         return;
       }
 
-      const newSource = {
+      const newSource: PhysicalPallet = {
         ...sourceSlot,
         isOccupied: false,
         projectId: "",
         notes: "",
+        status: "empty",
         ...(result.sourceVersion === undefined ? {} : { version: result.sourceVersion }),
       };
       const savedTarget = {

@@ -7,6 +7,7 @@ import {
   DEFAULT_LEVEL,
   LEVEL_OPTIONS,
   hasLevels,
+  isPalletStatus,
   isBayId,
   isFloorItemType,
   MAX_ITEM_ID_LENGTH,
@@ -36,6 +37,7 @@ function ensureShelfColumns() {
       ["level", "INTEGER"],
       ["cell_column", "INTEGER"],
       ["cell_row", "INTEGER"],
+      ["status", "TEXT NOT NULL DEFAULT 'empty'"],
     ];
     for (const [name, type] of wanted) {
       if (!existing.has(name)) db.exec(`ALTER TABLE pallet_slots ADD COLUMN ${name} ${type}`);
@@ -62,6 +64,7 @@ export async function GET() {
       isOccupied: slot.is_occupied === 1,
       projectId: slot.project_id || "",
       notes: slot.notes || "",
+      status: slot.status || "empty",
       xPos: slot.x_pos,
       yPos: slot.y_pos,
       widthCells: slot.width_cells ?? 1,
@@ -125,6 +128,7 @@ export async function POST(request: Request) {
       if (target.is_occupied === 1 || target.is_occupied === true) {
         return NextResponse.json({ error: "Destination blocked" }, { status: 400 });
       }
+      const sourceStatus = source.status || "empty";
 
       // Safeguard fallback layer for unseeded item types
       const sourceItem = source.itemType || source.item_type || "pallet";
@@ -138,12 +142,12 @@ export async function POST(request: Request) {
       try {
         db.transaction(() => {
           // Clear source slot parameters using exact database snake_case columns
-          db.prepare("UPDATE pallet_slots SET is_occupied = 0, project_id = '', notes = '', occupied_since = NULL, version = version + 1, updated_at = ? WHERE id = ?")
+          db.prepare("UPDATE pallet_slots SET is_occupied = 0, project_id = '', notes = '', status = 'empty', occupied_since = NULL, version = version + 1, updated_at = ? WHERE id = ?")
             .run(systemTime, sourceId);
             
           // Populate target slot parameters with source history data using exact database snake_case columns
-          db.prepare('UPDATE pallet_slots SET is_occupied = 1, project_id = ?, notes = ?, occupied_since = ?, version = version + 1, updated_at = ? WHERE id = ?')
-            .run(source.project_id, source.notes, source.occupied_since || systemTime, systemTime, targetId);
+          db.prepare('UPDATE pallet_slots SET is_occupied = 1, project_id = ?, notes = ?, status = ?, occupied_since = ?, version = version + 1, updated_at = ? WHERE id = ?')
+            .run(source.project_id, source.notes, sourceStatus, source.occupied_since || systemTime, systemTime, targetId);
             
           // FIXED: Wrapped the SQL query in double-quotes so internal text values use standard single-quotes
           db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'MOVED_PALLET', ?, ?, ?)")
@@ -226,10 +230,10 @@ export async function POST(request: Request) {
           }
 
           db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(oldZoneId);
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at, levels, parent_id, level, cell_column, cell_row) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, status, x_pos, y_pos, version, width_cells, height_cells, occupied_since, updated_at, levels, parent_id, level, cell_column, cell_row) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             .run(
               targetId, originalRecord.bay_id, originalRecord.item_type || "pallet", originalRecord.is_occupied,
-              originalRecord.project_id || "", originalRecord.notes || "", x, y, (originalRecord.version || 1) + 1,
+              originalRecord.project_id || "", originalRecord.notes || "", originalRecord.status || "empty", x, y, (originalRecord.version || 1) + 1,
               originalRecord.width_cells || 1, originalRecord.height_cells || 1, originalRecord.occupied_since, systemTime,
               originalRecord.levels ?? null, originalRecord.parent_id ?? null, originalRecord.level ?? null,
               originalRecord.cell_column ?? null, originalRecord.cell_row ?? null
@@ -258,15 +262,21 @@ export async function POST(request: Request) {
         }
         levels = requestedLevels;
       }
+      const status = itemType === "pallet" && isPalletStatus(body.status)
+        ? body.status
+        : "empty";
+      if (itemType === "pallet" && body.status !== undefined && !isPalletStatus(body.status)) {
+        return NextResponse.json({ error: "Invalid pallet status" }, { status: 400 });
+      }
 
       try {
         db.transaction(() => {
           db.prepare(`
             INSERT INTO pallet_slots (
               id, bay_id, item_type, is_occupied, project_id, notes,
-              x_pos, y_pos, version, width_cells, height_cells, updated_at, levels
-            ) VALUES (?, ?, ?, 0, '', '', ?, ?, 1, ?, ?, ?, ?)
-          `).run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime, levels);
+              status, x_pos, y_pos, version, width_cells, height_cells, updated_at, levels
+            ) VALUES (?, ?, ?, 0, '', '', ?, ?, ?, 1, ?, ?, ?, ?)
+          `).run(targetId, assignedBay, itemType, status, x, y, widthCells, heightCells, systemTime, levels);
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, NULL, ?, ?)')
             .run(targetId, "CREATED", JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells, levels }), systemTime);
         })();
@@ -293,6 +303,9 @@ export async function POST(request: Request) {
       (typeof body.notes !== "string" || body.notes.length > MAX_NOTES_LENGTH)
     ) {
       return NextResponse.json({ error: "Notes must be 4000 characters or fewer" }, { status: 400 });
+    }
+    if (body.status !== undefined && !isPalletStatus(body.status)) {
+      return NextResponse.json({ error: "Invalid pallet status" }, { status: 400 });
     }
 
     if (body.bayId !== undefined && !isBayId(body.bayId)) {
@@ -328,6 +341,7 @@ export async function POST(request: Request) {
     const updatedOccupied = typeof body.isOccupied === "boolean" ? (body.isOccupied ? 1 : 0) : oldRow.is_occupied;
     const updatedProjectId = typeof body.projectId === "string" ? body.projectId : oldRow.project_id;
     const updatedNotes = typeof body.notes === "string" ? body.notes : oldRow.notes;
+    const updatedStatus = isPalletStatus(body.status) ? body.status : (oldRow.status || "empty");
 
     let occupiedSinceTimestamp = oldRow.occupied_since;
     if (oldRow.is_occupied === 0 && updatedOccupied === 1) occupiedSinceTimestamp = systemTime;
@@ -389,8 +403,8 @@ export async function POST(request: Request) {
         yPos = body.yPos;
       }
 
-      db.prepare('UPDATE pallet_slots SET bay_id = ?, is_occupied = ?, project_id = ?, notes = ?, occupied_since = ?, x_pos = ?, y_pos = ?, parent_id = ?, level = ?, cell_column = ?, cell_row = ?, version = version + 1, updated_at = ? WHERE id = ?')
-        .run(updatedBayId, updatedOccupied, updatedProjectId, updatedNotes, occupiedSinceTimestamp, xPos, yPos, parentId, shelfLevel, cellColumn, cellRow, systemTime, targetId);
+      db.prepare('UPDATE pallet_slots SET bay_id = ?, is_occupied = ?, project_id = ?, notes = ?, status = ?, occupied_since = ?, x_pos = ?, y_pos = ?, parent_id = ?, level = ?, cell_column = ?, cell_row = ?, version = version + 1, updated_at = ? WHERE id = ?')
+        .run(updatedBayId, updatedOccupied, updatedProjectId, updatedNotes, updatedStatus, occupiedSinceTimestamp, xPos, yPos, parentId, shelfLevel, cellColumn, cellRow, systemTime, targetId);
       if (isMovingBay && !oldRow.parent_id) {
         db.prepare('UPDATE pallet_slots SET bay_id = ?, version = version + 1, updated_at = ? WHERE parent_id = ?')
           .run(updatedBayId, systemTime, targetId);
@@ -407,8 +421,8 @@ export async function POST(request: Request) {
         .run(
           targetId,
           computedAction,
-          JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1, shelf: oldRow.parent_id ?? null, bayId: oldRow.bay_id }),
-          JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1, shelf: parentId, bayId: updatedBayId }),
+          JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1, status: oldRow.status || "empty", shelf: oldRow.parent_id ?? null, bayId: oldRow.bay_id }),
+          JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1, status: updatedStatus, shelf: parentId, bayId: updatedBayId }),
           systemTime
         );
 

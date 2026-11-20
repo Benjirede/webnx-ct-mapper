@@ -5,10 +5,13 @@ import {
   FLOOR_ITEM_TYPES,
   DEFAULT_LEVEL,
   LEVEL_OPTIONS,
+  PALLET_STATUSES,
+  PALLET_STATUS_LABELS,
   hasLevels,
   MAX_ITEM_ID_LENGTH,
   type FloorItemType,
   type GridFootprint,
+  type PalletStatus,
   type PhysicalPallet,
 } from "./types";
 import InspectorPanel from "./InspectorPanel";
@@ -24,7 +27,13 @@ interface Props {
   placementAvailable: boolean;
   onStartPlacement: () => void;
   onCancelPlacement: () => void;
-  onCreate: (id: string, itemType: FloorItemType, footprint: GridFootprint, levels?: number) => Promise<boolean>;
+  onCreate: (
+    id: string,
+    itemType: FloorItemType,
+    footprint: GridFootprint,
+    levels?: number,
+    status?: PalletStatus,
+  ) => Promise<boolean>;
   /** The same handlers the Staging Inspector uses. Renaming the ID happens inside the inspector. */
   onSave: InspectorProps["onSave"];
   onRename?: InspectorProps["onRename"];
@@ -38,6 +47,7 @@ export default function AdminPanel({
   const [newSlotId, setNewSlotId] = useState("");
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
   const [levels, setLevels] = useState<number>(DEFAULT_LEVEL);
+  const [palletStatus, setPalletStatus] = useState<PalletStatus>("empty");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -58,11 +68,18 @@ export default function AdminPanel({
     if (!pendingFootprint || !placementAvailable || isCreating) return;
     setIsCreating(true);
     try {
-      if (await onCreate(newSlotId, itemType, pendingFootprint, itemHasLevels ? levels : undefined)) {
+      if (await onCreate(
+        newSlotId,
+        itemType,
+        pendingFootprint,
+        itemHasLevels ? levels : undefined,
+        itemType === "pallet" ? palletStatus : undefined,
+      )) {
         setIsConfirmOpen(false);
         setNewSlotId("");
         setItemType("pallet");
         setLevels(DEFAULT_LEVEL);
+        setPalletStatus("empty");
       }
     } finally {
       setIsCreating(false);
@@ -159,6 +176,22 @@ export default function AdminPanel({
               ))}
             </select>
           </div>
+
+          {itemType === "pallet" && (
+            <div className="space-y-1.5">
+              <label htmlFor="new-pallet-status" className="block text-xs font-medium text-gray-300">Pallet status</label>
+              <select
+                id="new-pallet-status"
+                value={palletStatus}
+                onChange={(e) => setPalletStatus(e.target.value as PalletStatus)}
+                className="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-gray-100 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+              >
+                {PALLET_STATUSES.map((status) => (
+                  <option key={status} value={status}>{PALLET_STATUS_LABELS[status]}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {itemHasLevels && (
             <div className="space-y-1.5">

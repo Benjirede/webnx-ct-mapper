@@ -13,6 +13,28 @@ const itemTypeStyles: Record<FloorItemType, string> = {
   other: styles.other,
 };
 
+const palletStatusStyles: Record<NonNullable<PhysicalPallet["status"]>, string> = {
+  empty: "border-violet-500 bg-violet-950/80 text-violet-100",
+  "in-progress": "border-blue-500 bg-blue-950/80 text-blue-100",
+  "on-hold": "border-red-500 bg-red-950/80 text-red-100",
+  "direct-sale": "border-yellow-400 bg-yellow-950/80 text-yellow-100",
+  "dc-techs": "border-green-500 bg-green-950/80 text-green-100",
+  inactive: "border-gray-500 bg-gray-800 text-gray-200",
+};
+
+const palletStatusColors: Record<NonNullable<PhysicalPallet["status"]>, {
+  backgroundColor: string;
+  borderColor: string;
+  color: string;
+}> = {
+  empty: { backgroundColor: "#4c1d95", borderColor: "#8b5cf6", color: "#ede9fe" },
+  "in-progress": { backgroundColor: "#1e3a8a", borderColor: "#3b82f6", color: "#dbeafe" },
+  "on-hold": { backgroundColor: "#7f1d1d", borderColor: "#ef4444", color: "#fee2e2" },
+  "direct-sale": { backgroundColor: "#713f12", borderColor: "#facc15", color: "#fef9c3" },
+  "dc-techs": { backgroundColor: "#14532d", borderColor: "#22c55e", color: "#dcfce7" },
+  inactive: { backgroundColor: "#374151", borderColor: "#6b7280", color: "#e5e7eb" },
+};
+
 interface Props {
   slot: PhysicalPallet;
   isAdminMode: boolean;
@@ -34,6 +56,8 @@ export default function PalletSlot({
   const levelCount = getLevelCount(slot);
   const isContainer = levelCount > 0;
   const capacity = slot.widthCells * slot.heightCells * levelCount;
+  const status = slot.status ?? "empty";
+  const statusColor = palletStatusColors[status];
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/source-id", slot.id);
@@ -90,6 +114,9 @@ export default function PalletSlot({
         style={{
           width: `${Math.max(32, slot.widthCells * CELL_WIDTH - 8)}px`,
           height: `${Math.max(28, slot.heightCells * CELL_HEIGHT - 8)}px`,
+          ...(slot.itemType === "pallet"
+            ? statusColor
+            : {}),
         }}
         className={`${styles.slotButton} ${itemTypeStyles[slot.itemType]} shadow-lg ${
           isAdminMode
@@ -101,7 +128,7 @@ export default function PalletSlot({
               : "cursor-pointer"
         } ${isSelected ? "ring-2 ring-emerald-400 border-transparent z-10 scale-105" : ""} ${
           matchesSearch ? styles.searchMatch : ""
-        }`}
+        } ${slot.itemType === "pallet" ? palletStatusStyles[status] : ""}`}
       >
         <div className="flex justify-between items-start w-full">
           <span className="text-[9px] font-mono bg-gray-950/80 text-gray-100 px-1 rounded font-bold truncate max-w-[70px]">

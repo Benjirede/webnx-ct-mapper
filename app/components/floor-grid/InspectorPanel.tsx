@@ -6,6 +6,9 @@ import {
   MAX_ITEM_ID_LENGTH,
   MAX_NOTES_LENGTH,
   MAX_PROJECT_NAME_LENGTH,
+  PALLET_STATUSES,
+  PALLET_STATUS_LABELS,
+  type PalletStatus,
   type PhysicalPallet,
 } from "./types";
 import DeleteItemButton from "./DeleteItemButton";
@@ -13,7 +16,7 @@ import DeleteItemButton from "./DeleteItemButton";
 interface Props {
   slot: PhysicalPallet;
   storedCount: number;
-  onSave: (projectId: string, notes: string) => void | Promise<void>;
+  onSave: (projectId: string, notes: string, status: PalletStatus) => void | Promise<void>;
   onDelete: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
   /** Renames the item's ID. When provided, an editable ID field is shown. */
   onRename?: (newName: string) => void | Promise<void>;
@@ -24,13 +27,14 @@ type Status = "idle" | "saving" | "success" | "error";
 export default function InspectorPanel({ slot, storedCount, onSave, onDelete, onRename }: Props) {
   const [projectId, setProjectId] = useState(slot.projectId);
   const [notes, setNotes] = useState(slot.notes ?? "");
-  const [saved, setSaved] = useState({ projectId: slot.projectId, notes: slot.notes ?? "" });
+  const [palletStatus, setPalletStatus] = useState<PalletStatus>(slot.status ?? "empty");
+  const [saved, setSaved] = useState({ projectId: slot.projectId, notes: slot.notes ?? "", status: slot.status ?? "empty" as PalletStatus });
   const [status, setStatus] = useState<Status>("idle");
   const [renameValue, setRenameValue] = useState(slot.id);
   const [renameError, setRenameError] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const isDataChanged = projectId !== saved.projectId || notes !== saved.notes;
+  const isDataChanged = projectId !== saved.projectId || notes !== saved.notes || palletStatus !== saved.status;
 
   const normalizedId = renameValue.trim().toUpperCase();
   const isIdEdited = !!onRename && normalizedId !== "" && normalizedId !== slot.id;
@@ -66,8 +70,8 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
     // synced under the current ID before the ID changes.
     if (isDataChanged) {
       try {
-        await onSave(projectId, notes);
-        setSaved({ projectId, notes });
+        await onSave(projectId, notes, palletStatus);
+        setSaved({ projectId, notes, status: palletStatus });
       } catch {
         setStatus("error");
         return;
@@ -178,6 +182,24 @@ export default function InspectorPanel({ slot, storedCount, onSave, onDelete, on
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {isPallet && (
+          <div className="space-y-1">
+            <label htmlFor="inspector-status" className="block text-xs font-mono text-gray-400">
+              PALLET STATUS
+            </label>
+            <select
+              id="inspector-status"
+              value={palletStatus}
+              onChange={(e) => setPalletStatus(e.target.value as PalletStatus)}
+              className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 focus:border-emerald-400 focus:outline-none"
+            >
+              {PALLET_STATUSES.map((status) => (
+                <option key={status} value={status}>{PALLET_STATUS_LABELS[status]}</option>
+              ))}
+            </select>
           </div>
         )}
 

@@ -33,6 +33,7 @@ db.exec(`
     y_pos REAL NOT NULL,
     version INTEGER DEFAULT 1,
     item_type TEXT NOT NULL DEFAULT 'pallet',
+    status TEXT NOT NULL DEFAULT 'empty',
     width_cells INTEGER NOT NULL DEFAULT 1,
     height_cells INTEGER NOT NULL DEFAULT 1,
     occupied_since TEXT,
