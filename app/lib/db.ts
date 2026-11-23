@@ -91,6 +91,14 @@ if (currentVersion < 5 || !palletSlotColumns.has('item_type')) {
   })();
 }
 
+if (currentVersion < 7) {
+  db.transaction(() => {
+    db.prepare("UPDATE pallet_slots SET item_type = 'other', version = version + 1 WHERE item_type = 'island'").run();
+    db.prepare("UPDATE pallet_slots SET item_type = 'desk', version = version + 1 WHERE item_type = 'workbench'").run();
+    db.pragma('user_version = 7');
+  })();
+}
+
 // Re-seed factory parameters directly matching multi-bay assignments
 const rowCount = db.prepare('SELECT COUNT(*) as count FROM pallet_slots').get() as { count: number };
 if (!rowCount || rowCount.count === 0) {

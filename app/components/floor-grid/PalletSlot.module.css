@@ -72,58 +72,141 @@
 
 .pallet {
   border-radius: 0.375rem;
-  background-color: #11aae7;
-  border-color: #111111;
-  color: #e74e11;
+}
+
+.palletStatus {
+  border-width: 1.5px;
+  border-style: solid;
+  border-radius: 0.375rem;
+}
+
+.palletStatusEmpty {
+  border: 1px dashed #64748b;
+  background: transparent;
+  color: #94a3b8;
+}
+
+.palletStatusInProgress {
+  border-color: #93c5fd;
+  background: #2563eb;
+  color: #fff;
+}
+
+.palletStatusOnHold {
+  border-color: #fca5a5;
+  background: #dc2626;
+  color: #fff;
+}
+
+.palletStatusDirectSale {
+  border-color: #fde047;
+  background: #facc15;
+  color: #1f2937;
+}
+
+.palletStatusDcTechs {
+  border-color: #86efac;
+  background: #16a34a;
+  color: #052e16;
+}
+
+.palletStatusTransfer {
+  border-color: #a5f3fc;
+  background: #22d3ee;
+  color: #1f2937;
+}
+
+.palletStatusInactive {
+  border-color: #d1d5db;
+  background: #6b7280;
+  color: #fff;
+}
+
+.palletStatusShelf {
+  border-color: #c4b5fd;
+  background: #8b5cf6;
+  color: #000;
+}
+
+.palletCardDetails {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.05;
+}
+
+.palletStatusLabel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.5625rem;
+}
+
+.shelfMovementBadge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.2rem;
+  padding: 0 0.15rem;
+  background: #ede9fe;
+  color: #4c1d95;
+  font-weight: 800;
+}
+
+.palletProjectId {
+  overflow: hidden;
+  font-size: 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .walkingLane {
-  border-color: #94a3b8;
   border-style: dashed;
-  background: repeating-linear-gradient(135deg, #1e293b 0 0.5rem, 
-#334155 0.5rem 1rem);
+  border-color: #94a3b8;
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 0.5rem,
+    rgb(148 163 184 / 0.18) 0.5rem 1rem
+  );
   color: #f1f5f9;
 }
 
 .desk {
-  border-color: #f59e0b;
+  border-color: #b45309;
   border-radius: 0.25rem;
-  background: #78350f;
-  color: #fef3c7;
+  background: #92400e;
+  color: #fff;
 }
 
 .shelf {
-  border-color: #fdba74;
+  border-color: #fed7aa;
   border-radius: 0.2rem;
-  background: #e74e11;
-  color: #fff7ed;
+  background-color: #ea580c;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 1.1rem,
+    rgb(255 247 237 / 0.3) 1.1rem,
+    rgb(255 247 237 / 0.3) 1.2rem
+  );
+  color: #111827;
 }
 
 .rack {
-  border-color: #a1a1aa;
+  border-color: #e2e8f0;
   border-radius: 0.2rem;
-  background: #111111;
-  color: #e5e7eb;
-}
-
-.island {
-  border-color: #93c5fd;
-  border-radius: 1rem;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-.workbench {
-  border-color: #4ade80;
-  border-radius: 0.25rem;
-  background: #14532d;
-  color: #dcfce7;
+  background: #0b0f19;
+  color: #f8fafc;
 }
 
 .other {
-  border-color: #9ca3af;
+  border-color: #d1d5db;
   border-style: dotted;
   border-radius: 0.75rem;
-  background: #374151;
-  color: #f3f4f6;
+  background: #6b7280;
+  color: #fff;
 }

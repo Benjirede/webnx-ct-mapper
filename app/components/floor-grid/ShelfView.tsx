@@ -1,29 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { CELL_HEIGHT, CELL_WIDTH } from "./layoutPositions";
-import { FLOOR_ITEM_LABELS, getLevelCount, matchesSearchQuery, type PhysicalPallet } from "./types";
+import {
+  FLOOR_ITEM_LABELS,
+  getLevelCount,
+  matchesSearchQuery,
+  PALLET_STATUS_GLYPHS,
+  PALLET_STATUS_LABELS,
+  type PhysicalPallet,
+} from "./types";
 import slotStyles from "./PalletSlot.module.css";
-
-const palletStatusStyles: Record<NonNullable<PhysicalPallet["status"]>, string> = {
-  empty: "border-violet-500 bg-violet-950/80 text-violet-100",
-  "in-progress": "border-blue-500 bg-blue-950/80 text-blue-100",
-  "on-hold": "border-red-500 bg-red-950/80 text-red-100",
-  "direct-sale": "border-yellow-400 bg-yellow-950/80 text-yellow-100",
-  "dc-techs": "border-green-500 bg-green-950/80 text-green-100",
-  inactive: "border-gray-500 bg-gray-800 text-gray-200",
-};
-
-const palletStatusColors: Record<NonNullable<PhysicalPallet["status"]>, {
-  backgroundColor: string;
-  borderColor: string;
-  color: string;
-}> = {
-  empty: { backgroundColor: "#4c1d95", borderColor: "#8b5cf6", color: "#ede9fe" },
-  "in-progress": { backgroundColor: "#1e3a8a", borderColor: "#3b82f6", color: "#dbeafe" },
-  "on-hold": { backgroundColor: "#7f1d1d", borderColor: "#ef4444", color: "#fee2e2" },
-  "direct-sale": { backgroundColor: "#713f12", borderColor: "#facc15", color: "#fef9c3" },
-  "dc-techs": { backgroundColor: "#14532d", borderColor: "#22c55e", color: "#dcfce7" },
-  inactive: { backgroundColor: "#374151", borderColor: "#6b7280", color: "#e5e7eb" },
-};
+import {
+  PALLET_STATUS_BADGES,
+  PALLET_STATUS_STYLES,
+} from "./floorItemStyles";
 
 const PANEL_MIN_WIDTH = 248;
 const PANEL_PADDING = 12;
@@ -232,6 +221,7 @@ export default function ShelfView({
             const key = `${column},${row}`;
             const pallet = byCell.get(key);
             const isHover = hoverCell === key;
+            const palletStatus = pallet?.status ?? "empty";
 
             return (
               <div
@@ -263,16 +253,16 @@ export default function ShelfView({
                   <button
                     type="button"
                     draggable
-                    style={palletStatusColors[pallet.status ?? "empty"]}
                     onClick={() => onSelect(pallet)}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/source-id", pallet.id);
                       e.dataTransfer.setData("text/drag-type", "move-payload");
                     }}
-                    title={pallet.notes || pallet.projectId}
-                    className={`flex h-full w-full flex-col justify-between rounded border border-amber-500 bg-amber-950/80 px-1.5 py-1 text-left text-amber-200 shadow-lg transition-all ${
+                    title={`${PALLET_STATUS_LABELS[palletStatus]}${pallet.projectId ? ` · ${pallet.projectId}` : ""}${pallet.notes ? ` · ${pallet.notes}` : ""}`}
+                    aria-label={`${pallet.id}, ${PALLET_STATUS_LABELS[palletStatus]}${pallet.projectId ? `, ${pallet.projectId}` : ""}`}
+                    className={`flex h-full w-full flex-col justify-between px-1.5 py-1 text-left shadow-lg transition-all ${
                       "cursor-grab active:cursor-grabbing"
-                    } ${palletStatusStyles[pallet.status ?? "empty"]} ${
+                    } ${slotStyles.pallet} ${PALLET_STATUS_STYLES[palletStatus]} ${
                       selectedId === pallet.id ? "ring-2 ring-emerald-400" : ""
                     } ${
                       matchesSearchQuery(pallet, query)
@@ -280,8 +270,23 @@ export default function ShelfView({
                         : ""
                     }`}
                   >
-                    <span className="truncate text-[9px] font-mono font-bold text-gray-100">{pallet.id}</span>
-                    <span className="truncate text-[9px] font-medium">ID: {pallet.projectId}</span>
+                    <span className="truncate rounded bg-gray-950/80 px-1 text-[9px] font-mono font-bold text-gray-100">{pallet.id}</span>
+                    <div className={slotStyles.palletCardDetails}>
+                      <span className={`${slotStyles.palletStatusLabel} truncate`}>
+                        {PALLET_STATUS_GLYPHS[palletStatus] && (
+                          <span
+                            aria-hidden="true"
+                            className={PALLET_STATUS_BADGES[palletStatus] ?? ""}
+                          >
+                            {PALLET_STATUS_GLYPHS[palletStatus]}
+                          </span>
+                        )}
+                        <span className="truncate">{PALLET_STATUS_LABELS[palletStatus]}</span>
+                      </span>
+                      {pallet.projectId && (
+                        <span className={slotStyles.palletProjectId}>ID: {pallet.projectId}</span>
+                      )}
+                    </div>
                   </button>
                 ) : (
                   <span className="select-none text-[9px] text-gray-600">Open</span>

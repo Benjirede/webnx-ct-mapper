@@ -1,16 +1,53 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { matchesSearchQuery, PhysicalPallet, type GridFootprint } from "./types";
+import {
+  FLOOR_ITEM_LABELS,
+  FLOOR_ITEM_TYPES,
+  matchesSearchQuery,
+  PALLET_STATUS_GLYPHS,
+  PALLET_STATUS_LABELS,
+  PALLET_STATUSES,
+  type FloorItemType,
+  type PalletStatus,
+  type PhysicalPallet,
+  type GridFootprint,
+} from "./types";
 import PalletSlot from "./PalletSlot";
 import FloorNav from "./FloorNav";
 import ShelfView from "./ShelfView";
 import { CELL_HEIGHT, CELL_WIDTH, findNearestOpenPosition, getBayGridSize, type CanvasSize } from "./layoutPositions";
 import type { BayId } from "./types";
 import styles from "./FloorCanvas.module.css";
+import itemStyles from "./PalletSlot.module.css";
+import {
+  FLOOR_ITEM_STYLES,
+  PALLET_STATUS_BADGES,
+  PALLET_STATUS_STYLES,
+} from "./floorItemStyles";
 import { BsLayoutSidebarReverse } from "react-icons/bs";
 
 const MIN_ZOOM = 50;
 const MAX_ZOOM = 200;
 const ZOOM_STEP = 10;
+
+const PALLET_STATUS_DESCRIPTIONS: Record<PalletStatus, string> = {
+  empty: "Vacant pallet slot.",
+  "in-progress": "Work is underway.",
+  "on-hold": "Temporarily paused or awaiting follow-up.",
+  "direct-sale": "Marked for direct sale.",
+  "dc-techs": "Assigned to DC Tech.",
+  inactive: "Chassis in storage and not currently in use.",
+  "put-on-shelf": "Pallet stored on a shelf.",
+  "take-down-from-shelf": "Pallet to be taken down from a shelf.",
+  "other-building": "Send the pallet to another building for storage.",
+};
+
+const FLOOR_ITEM_DESCRIPTIONS: Record<Exclude<FloorItemType, "pallet">, string> = {
+  "walking-lane": "Keep clear for access and movement.",
+  desk: "Workspace or work surface.",
+  shelf: "Multi-tier storage for pallets.",
+  rack: "Rack or equipment structure.",
+  other: "Other mapped floor object.",
+};
 
 interface DropPreview {
   xPct: number;
@@ -585,6 +622,64 @@ export default function FloorCanvas({
           )}
         </div>
       </div>
+      <section
+        aria-labelledby="floor-plan-key-title"
+        className={`${styles.floorLegend} mt-4 rounded-xl border border-gray-700 bg-gray-900 p-4`}
+      >
+        <h2 id="floor-plan-key-title" className="mb-4 text-sm font-semibold text-gray-100">
+          Floor Plan Key
+        </h2>
+        <div className={styles.floorLegendColumns}>
+          <div className={styles.floorLegendGroup}>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Pallet status
+            </h3>
+            <ul className={styles.floorLegendList}>
+              {PALLET_STATUSES.map((status) => (
+                <li key={status} className={styles.floorLegendItem}>
+                  <span
+                    aria-hidden="true"
+                    className={`${styles.legendSwatch} ${itemStyles.pallet} ${PALLET_STATUS_STYLES[status]}`}
+                  >
+                    {PALLET_STATUS_GLYPHS[status] && (
+                      <span className={PALLET_STATUS_BADGES[status] ?? ""}>
+                        {PALLET_STATUS_GLYPHS[status]}
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-100">{PALLET_STATUS_LABELS[status]}</p>
+                    <p className="text-[11px] leading-snug text-gray-400">
+                      {PALLET_STATUS_DESCRIPTIONS[status]}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className={styles.floorLegendGroup}>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Floor objects
+            </h3>
+            <ul className={styles.floorLegendList}>
+              {FLOOR_ITEM_TYPES.filter((itemType) => itemType !== "pallet").map((itemType) => (
+                <li key={itemType} className={styles.floorLegendItem}>
+                  <span
+                    aria-hidden="true"
+                    className={`${styles.legendSwatch} ${FLOOR_ITEM_STYLES[itemType]}`}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-100">{FLOOR_ITEM_LABELS[itemType]}</p>
+                    <p className="text-[11px] leading-snug text-gray-400">
+                      {FLOOR_ITEM_DESCRIPTIONS[itemType]}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
     </section>
   );
 }

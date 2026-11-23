@@ -19,8 +19,6 @@ export const FLOOR_ITEM_TYPES = [
   "desk",
   "shelf",
   "rack",
-  "island",
-  "workbench",
   "other"
 ] as const;
 
@@ -33,6 +31,9 @@ export const PALLET_STATUSES = [
   "direct-sale",
   "dc-techs",
   "inactive",
+  "put-on-shelf",
+  "take-down-from-shelf",
+  "other-building",
 ] as const;
 
 export type PalletStatus = (typeof PALLET_STATUSES)[number];
@@ -41,9 +42,21 @@ export const PALLET_STATUS_LABELS: Record<PalletStatus, string> = {
   empty: "Empty",
   "in-progress": "In Progress",
   "on-hold": "On Hold",
-  "direct-sale": "Direct Sale/Ebay",
-  "dc-techs": "DC Techs",
+  "direct-sale": "Direct Sale",
+  "dc-techs": "DC Tech",
   inactive: "Inactive",
+  "put-on-shelf": "Shelf Up",
+  "take-down-from-shelf": "Shelf Down",
+  "other-building": "Transfer",
+};
+
+export const PALLET_STATUS_GLYPHS: Partial<Record<PalletStatus, string>> = {
+  "in-progress": "▶",
+  "on-hold": "⏸",
+  "direct-sale": "$",
+  "put-on-shelf": "▲",
+  "take-down-from-shelf": "▼",
+  "other-building": "→",
 };
 
 export function isPalletStatus(value: unknown): value is PalletStatus {
@@ -57,8 +70,6 @@ export const FLOOR_ITEM_LABELS: Record<FloorItemType, string> = {
   desk: "Desk",
   shelf: "Shelf",
   rack: "Rack",
-  island: "Island",
-  workbench: "Workbench",
   other: "Other"
 };
 
