@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FLOOR_ITEM_LABELS,
   FLOOR_ITEM_TYPES,
@@ -26,6 +26,23 @@ export default function AdminPanel({
   const [itemType, setItemType] = useState<FloorItemType>("pallet");
   const [renameValue, setRenameValue] = useState(selectedSlot?.id ?? "");
 
+  // Pilot tester provisioning state
+  const [isSupervisor, setIsSupervisor] = useState(false);
+  const [newTester, setNewTester] = useState("");
+  const [testerStatus, setTesterStatus] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.role === "supervisor" || data?.username === "admin") {
+          setIsSupervisor(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingFootprint || !placementAvailable) return;
@@ -34,6 +51,36 @@ export default function AdminPanel({
     if (await onCreate(newSlotId, itemType, pendingFootprint)) {
       setNewSlotId("");
       setItemType("pallet");
+    }
+  };
+
+  const handleAddTester = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTester.trim()) return;
+    setCreatingUser(true);
+    setTesterStatus(null);
+
+    try {
+      const res = await fetch("/api/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newTester.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setTesterStatus({ type: "err", msg: data.error || "Failed to add user" });
+      } else {
+        setTesterStatus({
+          type: "ok",
+          msg: `Added "${data.username}" with default first-time password.`,
+        });
+        setNewTester("");
+      }
+    } catch {
+      setTesterStatus({ type: "err", msg: "Network error creating user" });
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -127,6 +174,44 @@ export default function AdminPanel({
               Save
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Pilot Tester Provisioning Section (Supervisor Only) */}
+      {isSupervisor && (
+        <div className="pt-4 border-t border-gray-700 space-y-2">
+          <label htmlFor="new-tester-username" className="text-xs text-emerald-400 font-mono font-bold block">
+            👤 PROVISION PILOT TESTER
+          </label>
+          <form onSubmit={handleAddTester} className="space-y-2">
+            <input
+              id="new-tester-username"
+              type="text"
+              placeholder="New tech username..."
+              value={newTester}
+              onChange={(e) => setNewTester(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-emerald-200 focus:outline-none focus:border-emerald-400"
+            />
+            <button
+              type="submit"
+              disabled={creatingUser || !newTester.trim()}
+              className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-mono font-bold uppercase text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creatingUser ? "Adding Tester..." : "+ Add Tester Account"}
+            </button>
+          </form>
+
+          {testerStatus && (
+            <div
+              className={`rounded border p-2 text-xs font-mono break-words ${
+                testerStatus.type === "ok"
+                  ? "border-emerald-700 bg-emerald-950/40 text-emerald-200"
+                  : "border-rose-700 bg-rose-950/40 text-rose-200"
+              }`}
+            >
+              {testerStatus.msg}
+            </div>
+          )}
         </div>
       )}
 

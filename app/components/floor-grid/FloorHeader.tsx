@@ -6,6 +6,11 @@ interface Props {
 }
 
 export default function FloorHeader({ isAdminMode, searchQuery, onToggleAdmin, onSearchChange }: Props) {
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   return (
     <header className="mb-6 border-b border-gray-800 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div>
@@ -32,6 +37,14 @@ export default function FloorHeader({ isAdminMode, searchQuery, onToggleAdmin, o
           onChange={(e) => onSearchChange(e.target.value)}
           className="bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400 placeholder-gray-500 shadow-md w-64"
         />
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider uppercase transition-colors shadow-md border bg-red-950/50 border-red-800/70 text-red-300 hover:bg-red-900/60 hover:text-white"
+        >
+          🚪 Sign Out
+        </button>
       </div>
     </header>
   );

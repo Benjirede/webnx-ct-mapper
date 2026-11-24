@@ -48,6 +48,59 @@ db.exec(`
   );
 `);
 
+import crypto from 'crypto';
+
+// 1. Password Hashing & Verification Helpers (Zero external packages needed)
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  const [salt, key] = storedHash.split(':');
+  if (!salt || !key) return false;
+  const hashBuffer = crypto.scryptSync(password, salt, 64);
+  const keyBuffer = Buffer.from(key, 'hex');
+  return crypto.timingSafeEqual(hashBuffer, keyBuffer);
+}
+
+// 2. Initialize Users Table & Update Audit Log
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'tech',
+    must_change_password INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Safely add 'must_change_password' if upgrading an existing DB
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 1;`);
+} catch {
+  // Column already exists
+}
+
+// Safely add 'username' column to audit_log if it doesn't exist yet
+try {
+  db.exec(`ALTER TABLE audit_log ADD COLUMN username TEXT DEFAULT 'system';`);
+} catch {
+  // Column already exists
+}
+
+// 3. Seed ONLY your Admin Account (must_change_password = 0 so test-image.sh works cleanly)
+const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+if (userCount.count === 0) {
+  db.prepare(
+    'INSERT OR IGNORE INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, ?, 0)'
+  ).run('admin', hashPassword('WebNXAdmin2026!'), 'supervisor');
+
+  db.prepare("UPDATE users SET role = 'supervisor', must_change_password = 0 WHERE username = 'admin'").run();
+}
+
 // Flush old tracking states to migrate configuration rows smoothly
 const currentVersion = (db.pragma('user_version', { simple: true }) as number) || 0;
 if (currentVersion < 3) {
