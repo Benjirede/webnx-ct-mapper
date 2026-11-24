@@ -80,6 +80,7 @@ export const DEFAULT_LEVEL = 1;
 export const MAX_ITEM_ID_LENGTH = 30;
 export const MAX_PROJECT_NAME_LENGTH = 64;
 export const MAX_NOTES_LENGTH = 8000;
+export const MAX_SEARCH_QUERY_LENGTH = 50;
 
 export const hasLevels = (type: FloorItemType): boolean =>
   LEVELED_ITEM_TYPES.includes(type);
