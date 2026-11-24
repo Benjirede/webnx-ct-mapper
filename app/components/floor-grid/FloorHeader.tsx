@@ -1,11 +1,6 @@
-interface Props {
-  isAdminMode: boolean;
-  searchQuery: string;
-  onToggleAdmin: () => void;
-  onSearchChange: (value: string) => void;
-}
+"use client";
 
-export default function FloorHeader({ isAdminMode, searchQuery, onToggleAdmin, onSearchChange }: Props) {
+export default function FloorHeader() {
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -18,26 +13,7 @@ export default function FloorHeader({ isAdminMode, searchQuery, onToggleAdmin, o
         <p className="text-gray-400 text-sm">Spatial visual map tracking of hardware pallets and custom project stages</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={onToggleAdmin}
-          className={`px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider uppercase transition-colors shadow-md border ${
-            isAdminMode
-              ? "bg-amber-500 border-amber-400 text-gray-950 animate-pulse"
-              : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-          }`}
-        >
-          {isAdminMode ? "🔒 Exit Blueprint Edit" : "🛠️ Edit Floor Layout Blueprint"}
-        </button>
-
-        <input
-          type="text"
-          placeholder="🔍 Search Project ID..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400 placeholder-gray-500 shadow-md w-64"
-        />
-
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={handleLogout}
