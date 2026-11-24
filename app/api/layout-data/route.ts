@@ -95,6 +95,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const systemTime = new Date().toISOString();
+    const actor = request.headers.get("x-user-name") || "system";
 
     // ------------------------------------------------------------------------
     // SUB-ROUTING INTENT A: ATOMIC SINGLE-TRANSACTION PALLET MOVEMENT
@@ -150,11 +151,12 @@ export async function POST(request: Request) {
             .run(source.project_id, source.notes, sourceStatus, source.occupied_since || systemTime, systemTime, targetId);
             
           // FIXED: Wrapped the SQL query in double-quotes so internal text values use standard single-quotes
-          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'MOVED_PALLET', ?, ?, ?)")
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, 'MOVED_PALLET', ?, ?, ?, ?)")
             .run(
               sourceId, 
               JSON.stringify({ projectId: source.project_id, notes: source.notes }), 
               JSON.stringify({ movedTo: targetId }), 
+              actor,
               systemTime
             );
 
@@ -244,8 +246,8 @@ export async function POST(request: Request) {
             db.prepare('UPDATE pallet_slots SET parent_id = ? WHERE parent_id = ?').run(targetId, oldZoneId);
           }
 
-          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, 'RENAMED', ?, ?, ?)")
-            .run(targetId, JSON.stringify({ id: oldZoneId }), JSON.stringify({ id: targetId }), systemTime);
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, 'RENAMED', ?, ?, ?, ?)")
+            .run(targetId, JSON.stringify({ id: oldZoneId }), JSON.stringify({ id: targetId }), actor, systemTime);
 
           return { status: 200 };
         })();
@@ -279,6 +281,10 @@ export async function POST(request: Request) {
           `).run(targetId, assignedBay, itemType, status, x, y, widthCells, heightCells, systemTime, levels);
           db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, NULL, ?, ?)')
             .run(targetId, "CREATED", JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells, levels }), systemTime);
+          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
+            .run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
+          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, 'CREATED', NULL, ?, ?, ?)")
+            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), actor, systemTime);
         })();
         return NextResponse.json({ success: true });
       } catch (e) {
@@ -427,6 +433,8 @@ export async function POST(request: Request) {
         );
 
       return { status: 200 };
+      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(targetId, computedAction, JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1 }), JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1 }), actor, systemTime);
     })();
 
     if (updateResult.status !== 200) {
@@ -446,6 +454,7 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetId = searchParams.get("id")?.trim().toUpperCase();
     const systemTime = new Date().toISOString();
+    const actor = request.headers.get("x-user-name") || "system";
 
     if (!targetId) return NextResponse.json({ error: "Missing locator: 'id'" }, { status: 400 });
     if (!verifyAdminPermission(request)) return NextResponse.json({ error: "Access Denied: Invalid credentials" }, { status: 401 });
@@ -464,6 +473,8 @@ export async function DELETE(request: Request) {
       db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(targetId);
       db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, NULL, ?)')
         .run(targetId, "DELETED", JSON.stringify(activeRecord), systemTime);
+      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, "DELETED", ?, NULL, ?, ?)')
+        .run(targetId, JSON.stringify(activeRecord), actor, systemTime);
 
       return { status: 200 };
     })();
