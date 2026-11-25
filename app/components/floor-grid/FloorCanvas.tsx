@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefO
 import {
   FLOOR_ITEM_LABELS,
   FLOOR_ITEM_TYPES,
+  MAX_SEARCH_QUERY_LENGTH,
   matchesSearchQuery,
   PALLET_STATUS_GLYPHS,
   PALLET_STATUS_LABELS,
@@ -438,7 +439,8 @@ export default function FloorCanvas({
           <input
             type="search"
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            maxLength={MAX_SEARCH_QUERY_LENGTH}
+            onChange={(e) => onSearchChange(e.currentTarget.value.slice(0, MAX_SEARCH_QUERY_LENGTH))}
             placeholder="Search ID, project, name, notes..."
             aria-label="Search by item ID, project, name, or notes"
             className={styles.toolbarSearch}
