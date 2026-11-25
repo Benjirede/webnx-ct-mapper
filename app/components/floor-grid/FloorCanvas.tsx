@@ -108,6 +108,7 @@ export default function FloorCanvas({
   const [zoomLevel, setZoomLevel] = useState(100);
   const [draggedSlot, setDraggedSlot] = useState<PhysicalPallet | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
+  const [isFloorLegendOpen, setIsFloorLegendOpen] = useState(true);
   const gridSize = getBayGridSize(activeBay);
   const fitScale = isFullscreen && viewportWidth > 0
     ? Math.min(1, viewportWidth / (gridSize.columns * CELL_WIDTH))
@@ -514,16 +515,37 @@ export default function FloorCanvas({
           </div>
           <div className={styles.toolbarGroup}>
             <button
-  type="button"
-  className={`${styles.panelToggle} ${isInspectorOpen ? styles.activePanelToggle : ""}`}
-  onClick={onToggleInspector}
-  aria-expanded={isInspectorOpen}
-  aria-controls="floor-inspector"
-  aria-label="Inspector panel"
-  title={`${isInspectorOpen ? "Hide" : "Show"} inspector (I)`}
->
-  <BsLayoutSidebarReverse aria-hidden="true" focusable="false" />
-</button>
+              type="button"
+              className={`${styles.panelToggle} ${isFloorLegendOpen ? styles.activePanelToggle : ""}`}
+              onClick={() => setIsFloorLegendOpen((open) => !open)}
+              aria-expanded={isFloorLegendOpen}
+              aria-controls="floor-plan-key"
+              aria-label={`${isFloorLegendOpen ? "Hide" : "Show"} floor plan key`}
+              title={`${isFloorLegendOpen ? "Hide" : "Show"} floor plan key`}
+            >
+              <svg
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={isFloorLegendOpen ? styles.legendToggleOpen : ""}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`${styles.panelToggle} ${isInspectorOpen ? styles.activePanelToggle : ""}`}
+              onClick={onToggleInspector}
+              aria-expanded={isInspectorOpen}
+              aria-controls="floor-inspector"
+              aria-label="Inspector panel"
+              title={`${isInspectorOpen ? "Hide" : "Show"} inspector (I)`}
+            >
+              <BsLayoutSidebarReverse aria-hidden="true" focusable="false" />
+            </button>
           </div>
         </div>
       </div>
@@ -624,64 +646,71 @@ export default function FloorCanvas({
           )}
         </div>
       </div>
-      <section
-        aria-labelledby="floor-plan-key-title"
-        className={`${styles.floorLegend} mt-4 rounded-xl border border-gray-700 bg-gray-900 p-4`}
+      <div
+        className={`${styles.floorLegendCollapse} ${isFloorLegendOpen ? "" : styles.floorLegendCollapsed}`}
+        aria-hidden={!isFloorLegendOpen}
+        inert={!isFloorLegendOpen}
       >
-        <h2 id="floor-plan-key-title" className="mb-4 text-sm font-semibold text-gray-100">
-          Floor Plan Key
-        </h2>
-        <div className={styles.floorLegendColumns}>
-          <div className={styles.floorLegendGroup}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Pallet status
-            </h3>
-            <ul className={styles.floorLegendList}>
-              {PALLET_STATUSES.map((status) => (
-                <li key={status} className={styles.floorLegendItem}>
-                  <span
-                    aria-hidden="true"
-                    className={`${styles.legendSwatch} ${itemStyles.pallet} ${PALLET_STATUS_STYLES[status]}`}
-                  >
-                    {PALLET_STATUS_GLYPHS[status] && (
-                      <span className={PALLET_STATUS_BADGES[status] ?? ""}>
-                        {PALLET_STATUS_GLYPHS[status]}
-                      </span>
-                    )}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-100">{PALLET_STATUS_LABELS[status]}</p>
-                    <p className="text-[11px] leading-snug text-gray-400">
-                      {PALLET_STATUS_DESCRIPTIONS[status]}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+        <section
+          id="floor-plan-key"
+          aria-labelledby="floor-plan-key-title"
+          className={`${styles.floorLegend} rounded-xl border border-gray-700 bg-gray-900 p-4`}
+        >
+          <h2 id="floor-plan-key-title" className="mb-4 text-sm font-semibold text-gray-100">
+            Floor Plan Key
+          </h2>
+          <div className={styles.floorLegendColumns}>
+            <div className={styles.floorLegendGroup}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Pallet status
+              </h3>
+              <ul className={styles.floorLegendList}>
+                {PALLET_STATUSES.map((status) => (
+                  <li key={status} className={styles.floorLegendItem}>
+                    <span
+                      aria-hidden="true"
+                      className={`${styles.legendSwatch} ${itemStyles.pallet} ${PALLET_STATUS_STYLES[status]}`}
+                    >
+                      {PALLET_STATUS_GLYPHS[status] && (
+                        <span className={PALLET_STATUS_BADGES[status] ?? ""}>
+                          {PALLET_STATUS_GLYPHS[status]}
+                        </span>
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-100">{PALLET_STATUS_LABELS[status]}</p>
+                      <p className="text-[11px] leading-snug text-gray-400">
+                        {PALLET_STATUS_DESCRIPTIONS[status]}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={styles.floorLegendGroup}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Floor objects
+              </h3>
+              <ul className={styles.floorLegendList}>
+                {FLOOR_ITEM_TYPES.filter((itemType) => itemType !== "pallet").map((itemType) => (
+                  <li key={itemType} className={styles.floorLegendItem}>
+                    <span
+                      aria-hidden="true"
+                      className={`${styles.legendSwatch} ${FLOOR_ITEM_STYLES[itemType]}`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-100">{FLOOR_ITEM_LABELS[itemType]}</p>
+                      <p className="text-[11px] leading-snug text-gray-400">
+                        {FLOOR_ITEM_DESCRIPTIONS[itemType]}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className={styles.floorLegendGroup}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Floor objects
-            </h3>
-            <ul className={styles.floorLegendList}>
-              {FLOOR_ITEM_TYPES.filter((itemType) => itemType !== "pallet").map((itemType) => (
-                <li key={itemType} className={styles.floorLegendItem}>
-                  <span
-                    aria-hidden="true"
-                    className={`${styles.legendSwatch} ${FLOOR_ITEM_STYLES[itemType]}`}
-                  />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-100">{FLOOR_ITEM_LABELS[itemType]}</p>
-                    <p className="text-[11px] leading-snug text-gray-400">
-                      {FLOOR_ITEM_DESCRIPTIONS[itemType]}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </section>
   );
 }
