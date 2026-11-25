@@ -68,15 +68,31 @@ else
 fi
 
 # 5. Execute an immediate, single-transaction atomic move over the network bridge
-echo -e "\n🧱 TEST 4: Executing single-transaction atomic move from RACK-R2 to vacant BAY-L2..."
+echo ""
+echo "🧱 TEST 4: Executing single-transaction atomic move from RACK-R2 to vacant BAY-L2..."
+
+# Ensure BAY-L2 is vacant before running the move test (in case a prior test left it occupied)
+BAY_L2_VER=$(curl -s -b "$COOKIE_JAR" http://localhost:3000/api/layout-data | grep -o '"id":"BAY-L2"[^}]*' | grep -o '"version":[0-9]*' | cut -d':' -f2)
+if [ -n "$BAY_L2_VER" ]; then
+  curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+    -H "Content-Type: application/json" \
+    -d "{\"id\":\"BAY-L2\",\"isOccupied\":false,\"projectId\":\"\",\"notes\":\"\",\"status\":\"empty\",\"version\":$BAY_L2_VER}" > /dev/null
+fi
+
 MOVE_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
   -H "Content-Type: application/json" \
-  -d '{"action": "move_pallet", "sourceId": "RACK-R2", "targetId": "BAY-L2"}')
+  -d '{"action":"move_pallet","sourceId":"RACK-R2","targetId":"BAY-L2"}')
 
-if [[ "$MOVE_RES" == *"success\":true"* ]]; then
+if echo "$MOVE_RES" | grep -q '"success":true'; then
   echo "✅ TEST 4 PASSED: Atomic shift completed flawlessly inside the SQLite transactional boundary."
+
+  # Clean up: move the test asset back from BAY-L2 to RACK-R2 so subsequent runs stay clean
+  curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+    -H "Content-Type: application/json" \
+    -d '{"action":"move_pallet","sourceId":"BAY-L2","targetId":"RACK-R2"}' > /dev/null
 else
   echo "❌ TEST 4 FAILED: Transaction engine threw an execution error: $MOVE_RES"
+  exit 1
 fi
 
 # 6. Check the production ledger audit trail timeline
