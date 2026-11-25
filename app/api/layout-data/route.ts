@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import { cookies } from "next/headers";
+import { verifySession } from "@/app/lib/auth";
 import { NextResponse } from "next/server";
 import db from "@/app/lib/db";
 import { getBayGridSize } from "@/app/components/floor-grid/layoutPositions";
@@ -95,7 +97,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const systemTime = new Date().toISOString();
-    const actor = request.headers.get("x-user-name") || "system";
+    const cookieStore = await cookies();
+    const token = cookieStore.get("webnx_session")?.value;
+    const session = await verifySession(token);
+    const actor = session?.username || request.headers.get("x-user-name") || "system";
 
     // ------------------------------------------------------------------------
     // SUB-ROUTING INTENT A: ATOMIC SINGLE-TRANSACTION PALLET MOVEMENT
@@ -279,12 +284,15 @@ export async function POST(request: Request) {
               status, x_pos, y_pos, version, width_cells, height_cells, updated_at, levels
             ) VALUES (?, ?, ?, 0, '', '', ?, ?, ?, 1, ?, ?, ?, ?)
           `).run(targetId, assignedBay, itemType, status, x, y, widthCells, heightCells, systemTime, levels);
-          db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, NULL, ?, ?)')
-            .run(targetId, "CREATED", JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells, levels }), systemTime);
-          db.prepare('INSERT INTO pallet_slots (id, bay_id, item_type, is_occupied, project_id, notes, x_pos, y_pos, version, width_cells, height_cells, updated_at) VALUES (?, ?, ?, 0, "", "", ?, ?, 1, ?, ?, ?)')
-            .run(targetId, assignedBay, itemType, x, y, widthCells, heightCells, systemTime);
-          db.prepare("INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, 'CREATED', NULL, ?, ?, ?)")
-            .run(targetId, JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells }), actor, systemTime);
+
+          db.prepare(
+            "INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, 'CREATED', NULL, ?, ?, ?)"
+          ).run(
+            targetId,
+            JSON.stringify({ id: targetId, bayId: assignedBay, itemType, x, y, widthCells, heightCells, levels }),
+            actor,
+            systemTime
+          );
         })();
         return NextResponse.json({ success: true });
       } catch (e) {
@@ -423,18 +431,17 @@ export async function POST(request: Request) {
       else if (oldRow.is_occupied === 0 && updatedOccupied === 1) computedAction = "PLACED_PALLET";
       else if (oldRow.is_occupied === 1 && updatedOccupied === 0) computedAction = "CLEARED_PALLET";
 
-      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, ?, ?)')
+      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, ?, ?, ?, ?, ?)')
         .run(
           targetId,
           computedAction,
           JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1, status: oldRow.status || "empty", shelf: oldRow.parent_id ?? null, bayId: oldRow.bay_id }),
           JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1, status: updatedStatus, shelf: parentId, bayId: updatedBayId }),
+          actor,
           systemTime
         );
 
       return { status: 200 };
-      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(targetId, computedAction, JSON.stringify({ project: oldRow.project_id, occupied: oldRow.is_occupied === 1 }), JSON.stringify({ project: updatedProjectId, occupied: updatedOccupied === 1 }), actor, systemTime);
     })();
 
     if (updateResult.status !== 200) {
@@ -454,7 +461,11 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetId = searchParams.get("id")?.trim().toUpperCase();
     const systemTime = new Date().toISOString();
-    const actor = request.headers.get("x-user-name") || "system";
+
+    const cookieStore = await cookies();
+    const token = cookieStore.get("webnx_session")?.value;
+    const session = await verifySession(token);
+    const actor = session?.username || request.headers.get("x-user-name") || "system";
 
     if (!targetId) return NextResponse.json({ error: "Missing locator: 'id'" }, { status: 400 });
     if (!verifyAdminPermission(request)) return NextResponse.json({ error: "Access Denied: Invalid credentials" }, { status: 401 });
@@ -471,10 +482,8 @@ export async function DELETE(request: Request) {
       if (activeRecord.is_occupied === 1) return { status: 400, error: "Zone occupied, please ensure Item is Empty." };
 
       db.prepare('DELETE FROM pallet_slots WHERE id = ?').run(targetId);
-      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, timestamp) VALUES (?, ?, ?, NULL, ?)')
-        .run(targetId, "DELETED", JSON.stringify(activeRecord), systemTime);
-      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, "DELETED", ?, NULL, ?, ?)')
-        .run(targetId, JSON.stringify(activeRecord), actor, systemTime);
+      db.prepare('INSERT INTO audit_log (pallet_id, action_type, old_value, new_value, username, timestamp) VALUES (?, ?, ?, NULL, ?, ?)')
+        .run(targetId, "DELETED", JSON.stringify(activeRecord), actor, systemTime);
 
       return { status: 200 };
     })();

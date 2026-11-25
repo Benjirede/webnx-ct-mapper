@@ -21,11 +21,11 @@ try {
   }
 }
 
-//initialize db schema
+// initialize db schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS pallet_slots (
     id TEXT PRIMARY KEY,
-    bay_id TEXT NOT NULL DEFAULT 'bay1',  -- Aligns database layer with frontend layout selections
+    bay_id TEXT NOT NULL DEFAULT 'bay1',
     is_occupied INTEGER DEFAULT 0,
     project_id TEXT,
     notes TEXT,
@@ -36,9 +36,15 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'empty',
     width_cells INTEGER NOT NULL DEFAULT 1,
     height_cells INTEGER NOT NULL DEFAULT 1,
+    levels INTEGER,
+    parent_id TEXT,
+    level INTEGER,
+    cell_column INTEGER,
+    cell_row INTEGER,
     occupied_since TEXT,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
 
   CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,6 +155,33 @@ if (currentVersion < 7) {
     db.prepare("UPDATE pallet_slots SET item_type = 'other', version = version + 1 WHERE item_type = 'island'").run();
     db.prepare("UPDATE pallet_slots SET item_type = 'desk', version = version + 1 WHERE item_type = 'workbench'").run();
     db.pragma('user_version = 7');
+  })();
+}
+
+if (currentVersion < 8) {
+  db.transaction(() => {
+    const cols = new Set(
+      (db.prepare('PRAGMA table_info(pallet_slots)').all() as Array<{ name: string }>).map(({ name }) => name)
+    );
+    if (!cols.has('status')) {
+      db.exec("ALTER TABLE pallet_slots ADD COLUMN status TEXT NOT NULL DEFAULT 'empty'");
+    }
+    if (!cols.has('levels')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN levels INTEGER');
+    }
+    if (!cols.has('parent_id')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN parent_id TEXT');
+    }
+    if (!cols.has('level')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN level INTEGER');
+    }
+    if (!cols.has('cell_column')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN cell_column INTEGER');
+    }
+    if (!cols.has('cell_row')) {
+      db.exec('ALTER TABLE pallet_slots ADD COLUMN cell_row INTEGER');
+    }
+    db.pragma('user_version = 8');
   })();
 }
 
