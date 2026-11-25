@@ -1,15 +1,32 @@
 #!/bin/bash
+set -e
 
 COOKIE_JAR="/tmp/webnx_test_cookies.txt"
 rm -f "$COOKIE_JAR"
 
+cleanup() {
+  if [ -f "$COOKIE_JAR" ]; then
+    # Empty TEST-SRC and TEST-DST first in case a mid-test failure left one occupied, then delete both
+    for SLOT in TEST-SRC TEST-DST; do
+      VER=$(curl -s -b "$COOKIE_JAR" http://localhost:3000/api/layout-data | grep -o "\"id\":\"$SLOT\"[^}]*" | grep -o '"version":[0-9]*' | cut -d':' -f2)
+      if [ -n "$VER" ]; then
+        curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+          -H "Content-Type: application/json" \
+          -d "{\"id\":\"$SLOT\",\"isOccupied\":false,\"projectId\":\"\",\"notes\":\"\",\"status\":\"empty\",\"version\":$VER}" > /dev/null
+        curl -s -b "$COOKIE_JAR" -X DELETE "http://localhost:3000/api/layout-data?id=$SLOT" \
+          -H "X-Admin-PIN: 1234" > /dev/null
+      fi
+    done
+    rm -f "$COOKIE_JAR"
+  fi
+}
+trap cleanup EXIT
+
 echo "🐳 KICKING OFF PRODUCTION DOCKER IMAGE INTEGRATION SUITE..."
 echo "--------------------------------------------------------"
 
-# 0. Verify middleware blocks unauthenticated access, then log in
 echo "🔐 TEST 0: Verifying auth guard and acquiring session cookie..."
 UNAUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/layout-data)
-
 if [ "$UNAUTH_CODE" != "401" ]; then
   echo "❌ TEST 0 FAILED: Expected 401 Unauthorized without session cookie, got $UNAUTH_CODE."
   exit 1
@@ -19,88 +36,92 @@ LOGIN_RES=$(curl -s -c "$COOKIE_JAR" -X POST http://localhost:3000/api/auth/logi
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"WebNXAdmin2026!"}')
 
-if [[ "$LOGIN_RES" != *"success\":true"* ]]; then
+if ! echo "$LOGIN_RES" | grep -q '"success":true'; then
   echo "❌ TEST 0 FAILED: Authentication failed: $LOGIN_RES"
   exit 1
-else
-  echo "✅ TEST 0 PASSED: Unauthenticated block verified and admin session cookie acquired."
 fi
-
-# 1. Verify endpoint accessibility and read seeded data
-echo -e "\n📡 TEST 1: Fetching initial layout state from container..."
-INITIAL_STATE=$(curl -s -b "$COOKIE_JAR" -X GET http://localhost:3000/api/layout-data)
-
-if [ -z "$INITIAL_STATE" ] || [[ "$INITIAL_STATE" == *"Error"* ]] || [[ "$INITIAL_STATE" == *"Unauthorized"* ]]; then
-  echo "❌ TEST 1 FAILED: Container returned an empty or unauthorized response."
-  exit 1
-else
-  echo "✅ TEST 1 PASSED: Successfully connected to container database layer."
-fi
-
-# 2. Extract active version signature for RACK-R2 from the live payload array
-CURRENT_VERSION=$(echo "$INITIAL_STATE" | grep -o '"id":"RACK-R2"[^}*]*' | grep -o '"version":[0-9]*' | cut -d: -f2)
-echo "ℹ️  Current database tracking marker for RACK-R2 is version: $CURRENT_VERSION"
-
-# 3. Simulate an outdated technician transaction save request (Forcing a Concurrency Conflict)
-STALE_VERSION=$((CURRENT_VERSION - 1))
-echo -e "\n🛡️  TEST 2: Firing a stale update write payload to force a 409 Concurrency Lock..."
-CONFLICT_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
-  -H "Content-Type: application/json" \
-  -d "{\"id\": \"RACK-R2\", \"projectId\": \"9999\", \"notes\": \"Stale Hazard\", \"isOccupied\": true, \"version\": $STALE_VERSION}")
-
-if [[ "$CONFLICT_RES" == *"Conflict"* ]]; then
-  echo "✅ TEST 2 PASSED: Container caught the stale write and protected row integrity!"
-  echo "   Server response: $CONFLICT_RES"
-else
-  echo "❌ TEST 2 FAILED: Container allowed an out-of-order overwrite! Check concurrency logic."
-fi
-
-# 4. Execute a healthy, version-matched inline data value update
-echo -e "\n🔄 TEST 3: Submitting valid version token ($CURRENT_VERSION) to modify asset metadata..."
-UPDATE_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
-  -H "Content-Type: application/json" \
-  -d "{\"id\": \"RACK-R2\", \"projectId\": \"7777\", \"notes\": \"WebNX Production Node\", \"isOccupied\": true, \"version\": $CURRENT_VERSION}")
-
-if [[ "$UPDATE_RES" == *"success\":true"* ]]; then
-  echo "✅ TEST 3 PASSED: Writable update committed successfully. Row version incremented to $((CURRENT_VERSION + 1))."
-else
-  echo "❌ TEST 3 FAILED: Server rejected a valid contract payload: $UPDATE_RES"
-fi
-
-# 5. Execute an immediate, single-transaction atomic move over the network bridge
+echo "✅ TEST 0 PASSED: Unauthenticated block verified and admin session cookie acquired."
 echo ""
-echo "🧱 TEST 4: Executing single-transaction atomic move from RACK-R2 to vacant BAY-L2..."
 
-# Ensure BAY-L2 is vacant before running the move test (in case a prior test left it occupied)
-BAY_L2_VER=$(curl -s -b "$COOKIE_JAR" http://localhost:3000/api/layout-data | grep -o '"id":"BAY-L2"[^}]*' | grep -o '"version":[0-9]*' | cut -d':' -f2)
-if [ -n "$BAY_L2_VER" ]; then
-  curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
-    -H "Content-Type: application/json" \
-    -d "{\"id\":\"BAY-L2\",\"isOccupied\":false,\"projectId\":\"\",\"notes\":\"\",\"status\":\"empty\",\"version\":$BAY_L2_VER}" > /dev/null
+echo "📡 TEST 1: Provisioning temporary test pallets (TEST-SRC & TEST-DST) and verifying DB layer..."
+# Clear any leftover test slots from an interrupted prior run
+cleanup
+curl -s -c "$COOKIE_JAR" -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"WebNXAdmin2026!"}' > /dev/null
+
+CREATE_SRC=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+  -H "Content-Type: application/json" \
+  -d '{"action":"create","id":"TEST-SRC","bayId":"bay1","itemType":"pallet","xPos":5,"yPos":5,"widthCells":1,"heightCells":1}')
+
+CREATE_DST=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+  -H "Content-Type: application/json" \
+  -d '{"action":"create","id":"TEST-DST","bayId":"bay1","itemType":"pallet","xPos":15,"yPos":5,"widthCells":1,"heightCells":1}')
+
+if ! echo "$CREATE_SRC" | grep -q '"success":true' || ! echo "$CREATE_DST" | grep -q '"success":true'; then
+  echo "❌ TEST 1 FAILED: Could not create temporary test pallets: $CREATE_SRC / $CREATE_DST"
+  exit 1
 fi
 
+INITIAL_DATA=$(curl -s -b "$COOKIE_JAR" http://localhost:3000/api/layout-data)
+CURRENT_VER=$(echo "$INITIAL_DATA" | grep -o '"id":"TEST-SRC"[^}]*' | grep -o '"version":[0-9]*' | cut -d':' -f2)
+
+if [ -z "$CURRENT_VER" ]; then
+  echo "❌ TEST 1 FAILED: Failed to read version tracker for TEST-SRC from database."
+  exit 1
+fi
+echo "✅ TEST 1 PASSED: Successfully connected to container database layer."
+echo "ℹ️  Current database tracking marker for TEST-SRC is version: $CURRENT_VER"
+echo ""
+
+echo "🛡️  TEST 2: Firing a stale update write payload to force a 409 Concurrency Lock..."
+STALE_VER=$((CURRENT_VER - 1))
+STALE_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"TEST-SRC\",\"isOccupied\":true,\"projectId\":\"9999\",\"notes\":\"Stale write\",\"version\":$STALE_VER}")
+
+if echo "$STALE_RES" | grep -q '"currentVersion"'; then
+  echo "✅ TEST 2 PASSED: Container caught the stale write and protected row integrity!"
+  echo "   Server response: $STALE_RES"
+else
+  echo "❌ TEST 2 FAILED: Container allowed an out-of-order overwrite! Response: $STALE_RES"
+  exit 1
+fi
+echo ""
+
+echo "🔄 TEST 3: Submitting valid version token ($CURRENT_VER) to modify asset metadata..."
+VALID_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"TEST-SRC\",\"isOccupied\":true,\"projectId\":\"7777\",\"notes\":\"WebNX Production Node\",\"version\":$CURRENT_VER}")
+
+if echo "$VALID_RES" | grep -q '"success":true'; then
+  NEW_VER=$((CURRENT_VER + 1))
+  echo "✅ TEST 3 PASSED: Writable update committed successfully. Row version incremented to $NEW_VER."
+else
+  echo "❌ TEST 3 FAILED: Server rejected a valid contract payload: $VALID_RES"
+  exit 1
+fi
+echo ""
+
+echo "🧱 TEST 4: Executing single-transaction atomic move from TEST-SRC to vacant TEST-DST..."
 MOVE_RES=$(curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
   -H "Content-Type: application/json" \
-  -d '{"action":"move_pallet","sourceId":"RACK-R2","targetId":"BAY-L2"}')
+  -d '{"action":"move_pallet","sourceId":"TEST-SRC","targetId":"TEST-DST"}')
 
 if echo "$MOVE_RES" | grep -q '"success":true'; then
   echo "✅ TEST 4 PASSED: Atomic shift completed flawlessly inside the SQLite transactional boundary."
-
-  # Clean up: move the test asset back from BAY-L2 to RACK-R2 so subsequent runs stay clean
-  curl -s -b "$COOKIE_JAR" -X POST http://localhost:3000/api/layout-data \
-    -H "Content-Type: application/json" \
-    -d '{"action":"move_pallet","sourceId":"BAY-L2","targetId":"RACK-R2"}' > /dev/null
 else
   echo "❌ TEST 4 FAILED: Transaction engine threw an execution error: $MOVE_RES"
   exit 1
 fi
+echo ""
 
-# 6. Check the production ledger audit trail timeline
-echo -e "\n📜 TEST 5: Fetching server audit log timeline..."
-AUDIT_LOG=$(curl -s -b "$COOKIE_JAR" -X GET http://localhost:3000/api/audit-log)
-echo "📊 Audit Trail snapshot: $AUDIT_LOG"
-
-rm -f "$COOKIE_JAR"
-
+echo "📜 TEST 5: Fetching server audit log timeline..."
+AUDIT_RES=$(curl -s -b "$COOKIE_JAR" http://localhost:3000/api/audit-log)
+if ! echo "$AUDIT_RES" | grep -q '^\['; then
+  echo "❌ TEST 5 FAILED: Expected JSON array from /api/audit-log, got: $(echo "$AUDIT_RES" | head -c 200)"
+  exit 1
+fi
+echo "📊 Audit Trail snapshot: $(echo "$AUDIT_RES" | head -c 500)..."
 echo "--------------------------------------------------------"
 echo "🎉 ALL DOCKER IMAGE PRODUCTION CHECKS ENFORCED SUCCESSFULLY!"
